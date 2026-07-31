@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book an Appointment — AG Greater Accra East Region</title>
+<style>
+  :root{
+    --navy:#2F3080;
+    --navy-dark:#232566;
+    --gold:#EEDF10;
+    --lavender:#B4B8DA;
+    --lavender-light:#E7E8F3;
+    --white:#FFFFFF;
+    --ink:#1A1A1A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:"Calibri","Segoe UI",system-ui,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(180deg,var(--navy) 0%, var(--navy) 160px, var(--lavender-light) 160px, var(--lavender-light) 100%);
+    display:flex;
+    justify-content:center;
+    padding:0 16px 60px;
+  }
+  h1,h2,h3{ font-family:"Cambria","Georgia",serif; margin:0; }
+  .app{ width:100%; max-width:560px; }
+
+  header.brand{
+    text-align:center;
+    padding:28px 0 18px;
+    color:var(--white);
+  }
+  header.brand img{ width:64px; height:auto; display:block; margin:0 auto 10px; }
+  header.brand .region{
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--gold);
+    font-weight:700;
+    margin-bottom:4px;
+  }
+  header.brand h1{ font-size:22px; font-weight:700; }
+
+  /* Ribbon step indicator */
+  .ribbon{
+    display:flex;
+    background:var(--white);
+    border-radius:var(--radius);
+    box-shadow:0 6px 20px rgba(35,37,102,0.15);
+    overflow:hidden;
+    margin-top:-18px;
+    position:relative;
+    z-index:2;
+  }
+  .ribbon .seg{
+    flex:1;
+    text-align:center;
+    padding:10px 4px;
+    font-size:11px;
+    letter-spacing:.04em;
+    color:var(--navy);
+    opacity:.45;
+    border-bottom:3px solid var(--lavender-light);
+    font-weight:700;
+  }
+  .ribbon .seg.active{ opacity:1; border-bottom-color:var(--gold); }
+  .ribbon .seg.done{ opacity:.8; border-bottom-color:var(--gold); }
+
+  .card{
+    background:var(--white);
+    border-radius:var(--radius);
+    margin-top:16px;
+    padding:24px 22px;
+    box-shadow:0 6px 20px rgba(35,37,102,0.08);
+  }
+  .card h2{ font-size:19px; color:var(--navy); margin-bottom:4px; }
+  .card .sub{ font-size:13.5px; color:#555; margin-bottom:18px; }
+
+  .officer-card{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:var(--lavender-light);
+    border:2px solid transparent;
+    border-radius:var(--radius);
+    padding:14px 16px;
+    margin-bottom:12px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .officer-card:hover{ border-color:var(--lavender); }
+  .officer-card .eyebrow{
+    font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--navy); opacity:.75; font-weight:700; margin-bottom:2px;
+  }
+  .officer-card .name{ font-family:"Cambria",serif; font-size:17px; color:var(--navy); font-weight:700; }
+  .officer-card .hours{ font-size:12.5px; color:#555; margin-top:4px; }
+
+  .date-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:18px; }
+  .chip{
+    flex:0 0 auto;
+    background:var(--lavender-light);
+    border:2px solid transparent;
+    border-radius:20px;
+    padding:8px 14px;
+    font-size:13px;
+    font-weight:700;
+    color:var(--navy);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .chip.selected{ border-color:var(--gold); background:var(--navy); color:var(--white); }
+
+  .slot-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .slot{
+    background:var(--lavender-light);
+    border:2px solid transparent;
+    border-radius:8px;
+    padding:10px 4px;
+    font-size:13px;
+    font-weight:700;
+    color:var(--navy);
+    cursor:pointer;
+    text-align:center;
+  }
+  .slot.selected{ border-color:var(--gold); background:var(--navy); color:var(--white); }
+  .slot:disabled{ opacity:.35; text-decoration:line-through; cursor:not-allowed; }
+  .empty-note{ font-size:13.5px; color:#666; padding:14px 0; text-align:center; }
+
+  label{ display:block; font-size:13px; font-weight:700; color:var(--navy); margin:14px 0 5px; }
+  input,textarea{
+    width:100%; padding:11px 12px; font-size:15px;
+    border:1.5px solid var(--lavender); border-radius:8px;
+    font-family:inherit; color:var(--ink);
+  }
+  input:focus,textarea:focus{ outline:none; border-color:var(--navy); }
+  textarea{ resize:vertical; min-height:70px; }
+
+  .btn-row{ display:flex; gap:10px; margin-top:22px; }
+  button.primary,button.secondary{
+    flex:1; padding:13px; border-radius:8px; border:none;
+    font-family:"Calibri",sans-serif; font-size:15px; font-weight:700; cursor:pointer;
+  }
+  button.primary{ background:var(--navy); color:var(--white); }
+  button.primary:hover{ background:var(--navy-dark); }
+  button.primary:disabled{ background:#ccc; cursor:not-allowed; }
+  button.secondary{ background:var(--lavender-light); color:var(--navy); }
+
+  .error{
+    background:#FDECEC; color:#9B2C2C; border-radius:8px;
+    padding:10px 12px; font-size:13.5px; margin-top:14px;
+  }
+
+  .confirm{ text-align:center; padding:10px 0; }
+  .confirm .check{
+    width:56px; height:56px; border-radius:50%; background:var(--gold);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 16px;
+    font-size:28px; color:var(--navy);
+  }
+  .confirm .ref{
+    display:inline-block; margin-top:10px; background:var(--lavender-light);
+    color:var(--navy); font-weight:700; letter-spacing:.06em;
+    padding:6px 14px; border-radius:6px; font-size:14px;
+  }
+  .confirm p{ font-size:14px; color:#444; line-height:1.6; margin-top:14px; }
+
+  footer{ text-align:center; margin-top:22px; font-size:11.5px; color:var(--navy); opacity:.55; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="brand">
+    <img src="ag-shield-logo.png" alt="Assemblies of God shield" />
+    <div class="region">Greater Accra East Region</div>
+    <h1>Book an Appointment</h1>
+  </header>
+
+  <div class="ribbon">
+    <div class="seg" data-step="1">Officer</div>
+    <div class="seg" data-step="2">Date &amp; Time</div>
+    <div class="seg" data-step="3">Your Details</div>
+    <div class="seg" data-step="4">Confirmed</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card" id="step1">
+    <h2>Who would you like to meet?</h2>
+    <div class="sub">Select an Executive Officer of the Region.</div>
+    <div id="officerList"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card" id="step2" style="display:none">
+    <h2>Choose a date &amp; time</h2>
+    <div class="sub" id="officerNote"></div>
+    <div class="date-row" id="dateRow"></div>
+    <div class="slot-grid" id="slotGrid"></div>
+    <div class="btn-row">
+      <button class="secondary" onclick="goToStep(1)">Back</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card" id="step3" style="display:none">
+    <h2>Your details</h2>
+    <div class="sub">We'll use this to confirm your appointment.</div>
+    <label for="fName">Full name</label>
+    <input id="fName" type="text" placeholder="e.g. Grace Mensah" />
+    <label for="fPhone">Phone number</label>
+    <input id="fPhone" type="tel" placeholder="e.g. 024 123 4567" />
+    <label for="fChurch">Church / District</label>
+    <input id="fChurch" type="text" placeholder="e.g. Bethel Family Chapel, Tema" />
+    <label for="fPurpose">Purpose of visit</label>
+    <textarea id="fPurpose" placeholder="Briefly, what is this appointment about?"></textarea>
+    <div id="formError"></div>
+    <div class="btn-row">
+      <button class="secondary" onclick="goToStep(2)">Back</button>
+      <button class="primary" id="submitBtn" onclick="submitBooking()">Request Appointment</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card" id="step4" style="display:none">
+    <div class="confirm">
+      <div class="check">✓</div>
+      <h2>Appointment Requested</h2>
+      <p>
+        Your request has been sent to the Regional Office. An officer or the
+        receptionist will contact you by phone to confirm your appointment.
+      </p>
+      <div class="ref" id="refCode"></div>
+    </div>
+  </div>
+
+  <footer>Assemblies of God, Ghana — Greater Accra East Region</footer>
+</div>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const SUPABASE_URL = 'https://fdcpvocferfjfvwbzhhe.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkY3B2b2NmZXJmamZ2d2J6aGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDk0NTgsImV4cCI6MjEwMTA4NTQ1OH0.j_6nhUKOjwesGGHMubgHvHzOg4184pTQ9e9Djnz-KwE';
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const state = { officers: [], officeHours: [], selectedOfficer: null, selectedDate: null, selectedTime: null };
+
+  const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  function goToStep(n){
+    for(let i=1;i<=4;i++) document.getElementById('step'+i).style.display = (i===n) ? 'block' : 'none';
+    document.querySelectorAll('.ribbon .seg').forEach(seg=>{
+      const s = parseInt(seg.dataset.step);
+      seg.classList.toggle('active', s===n);
+      seg.classList.toggle('done', s<n);
+    });
+  }
+  window.goToStep = goToStep;
+
+  async function loadOfficers(){
+    const { data: officers } = await supabase.from('officers').select('*').eq('active', true).order('title');
+    const { data: hours } = await supabase.from('office_hours').select('*');
+    state.officers = officers || [];
+    state.officeHours = hours || [];
+
+    const list = document.getElementById('officerList');
+    list.innerHTML = '';
+    state.officers.forEach(o=>{
+      const oh = state.officeHours.filter(h=>h.officer_id===o.id);
+      const days = [...new Set(oh.map(h=>DAY_NAMES[h.weekday]))].join(' & ');
+      const range = oh.length ? `${fmtTime(oh[0].start_time)} – ${fmtTime(oh[0].end_time)}` : '';
+      const btn = document.createElement('button');
+      btn.className = 'officer-card';
+      btn.innerHTML = `<div class="eyebrow">${o.title}</div>
+        <div class="name">${o.full_name}</div>
+        <div class="hours">Office hours: ${days}, ${range}</div>`;
+      btn.onclick = () => selectOfficer(o);
+      list.appendChild(btn);
+    });
+  }
+
+  function fmtTime(t){
+    const [h,m] = t.split(':').map(Number);
+    const ampm = h>=12 ? 'PM':'AM';
+    const h12 = ((h+11)%12)+1;
+    return `${h12}:${m.toString().padStart(2,'0')} ${ampm}`;
+  }
+
+  function selectOfficer(o){
+    state.selectedOfficer = o;
+    document.getElementById('officerNote').textContent = `Meeting with ${o.full_name} — ${o.title}`;
+    renderDates();
+    goToStep(2);
+  }
+
+  function renderDates(){
+    const oh = state.officeHours.filter(h=>h.officer_id===state.selectedOfficer.id);
+    const validWeekdays = oh.map(h=>h.weekday);
+    const dates = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    for(let i=0;i<28 && dates.length<8;i++){
+      const d = new Date(today); d.setDate(today.getDate()+i);
+      if(validWeekdays.includes(d.getDay())) dates.push(d);
+    }
+    const row = document.getElementById('dateRow');
+    row.innerHTML = '';
+    dates.forEach((d,idx)=>{
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = d.toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short'});
+      chip.onclick = () => selectDate(d, chip);
+      row.appendChild(chip);
+      if(idx===0) selectDate(d, chip);
+    });
+  }
+
+  function dateStr(d){ return d.toISOString().slice(0,10); }
+
+  async function selectDate(d, chipEl){
+    state.selectedDate = d;
+    state.selectedTime = null;
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+    chipEl.classList.add('selected');
+    await renderSlots();
+  }
+
+  async function renderSlots(){
+    const grid = document.getElementById('slotGrid');
+    grid.innerHTML = '<div class="empty-note">Loading available times…</div>';
+
+    const oh = state.officeHours.find(h=>h.officer_id===state.selectedOfficer.id && h.weekday===state.selectedDate.getDay());
+    if(!oh){ grid.innerHTML = '<div class="empty-note">No office hours on this day.</div>'; return; }
+
+    const ds = dateStr(state.selectedDate);
+    const { data: booked } = await supabase.from('appointments')
+      .select('requested_time')
+      .eq('officer_id', state.selectedOfficer.id)
+      .eq('requested_date', ds)
+      .in('status', ['pending','confirmed','rescheduled']);
+    const bookedTimes = new Set((booked||[]).map(b=>b.requested_time.slice(0,5)));
+
+    const [sh,sm] = oh.start_time.split(':').map(Number);
+    const [eh,em] = oh.end_time.split(':').map(Number);
+    const startMin = sh*60+sm, endMin = eh*60+em;
+    const now = new Date();
+    const isToday = dateStr(now) === ds;
+    const nowMin = now.getHours()*60 + now.getMinutes();
+
+    grid.innerHTML = '';
+    let any = false;
+    for(let m=startMin; m<endMin; m+=oh.slot_minutes){
+      const hh = String(Math.floor(m/60)).padStart(2,'0');
+      const mm = String(m%60).padStart(2,'0');
+      const timeKey = `${hh}:${mm}`;
+      const taken = bookedTimes.has(timeKey);
+      const past = isToday && m<=nowMin;
+      const btn = document.createElement('button');
+      btn.className = 'slot';
+      btn.textContent = fmtTime(timeKey);
+      btn.disabled = taken || past;
+      if(!btn.disabled){
+        any = true;
+        btn.onclick = () => {
+          document.querySelectorAll('.slot').forEach(s=>s.classList.remove('selected'));
+          btn.classList.add('selected');
+          state.selectedTime = timeKey;
+          goToStep(3);
+        };
+      }
+      grid.appendChild(btn);
+    }
+    if(!any) grid.innerHTML = '<div class="empty-note">No open slots on this day — please pick another date.</div>';
+  }
+
+  async function submitBooking(){
+    const name = document.getElementById('fName').value.trim();
+    const phone = document.getElementById('fPhone').value.trim();
+    const church = document.getElementById('fChurch').value.trim();
+    const purpose = document.getElementById('fPurpose').value.trim();
+    const errEl = document.getElementById('formError');
+    errEl.innerHTML = '';
+
+    if(!name || !phone || !church){
+      errEl.innerHTML = '<div class="error">Please fill in your name, phone number, and church/district.</div>';
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    const { data, error } = await supabase.from('appointments').insert({
+      officer_id: state.selectedOfficer.id,
+      requester_name: name,
+      requester_phone: phone,
+      requester_church: church,
+      purpose: purpose,
+      requested_date: dateStr(state.selectedDate),
+      requested_time: state.selectedTime,
+      status: 'pending'
+    }).select().single();
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Request Appointment';
+
+    if(error){
+      if(error.code === '23505'){
+        errEl.innerHTML = '<div class="error">Sorry, that time slot was just taken. Please choose another.</div>';
+        goToStep(2);
+        await renderSlots();
+      } else {
+        errEl.innerHTML = '<div class="error">Something went wrong. Please try again.</div>';
+      }
+      return;
+    }
+
+    document.getElementById('refCode').textContent = 'Ref: ' + data.id.slice(0,8).toUpperCase();
+    goToStep(4);
+  }
+  window.submitBooking = submitBooking;
+
+  loadOfficers();
+</script>
+</body>
+</html>
