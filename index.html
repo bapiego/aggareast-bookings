@@ -215,7 +215,7 @@
     <label for="fChurch">Church / District</label>
     <input id="fChurch" type="text" placeholder="e.g. Bethel Family Chapel, Tema" />
     <label for="fPurpose">Purpose of visit</label>
-    <textarea id="fPurpose" placeholder="Briefly, what is this appointment about?"></textarea>
+    <textarea id="fPurpose" placeholder="e.g. Discuss building permit approval for our new church auditorium in Adenta — the clearer your purpose, the sooner your appointment can be prioritized. Please avoid generic terms like 'official' or 'personal'."></textarea>
     <div id="formError"></div>
     <div class="btn-row">
       <button class="secondary" onclick="goToStep(2)">Back</button>
@@ -261,7 +261,7 @@
   window.goToStep = goToStep;
 
   async function loadOfficers(){
-    const { data: officers } = await supabase.from('officers').select('*').eq('active', true).order('title');
+    const { data: officers } = await supabase.from('officers').select('*').eq('active', true).order('sort_order');
     const { data: hours } = await supabase.from('office_hours').select('*');
     state.officers = officers || [];
     state.officeHours = hours || [];
@@ -392,7 +392,9 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting…';
 
-    const { data, error } = await supabase.from('appointments').insert({
+    const newId = crypto.randomUUID();
+    const { error } = await supabase.from('appointments').insert({
+      id: newId,
       officer_id: state.selectedOfficer.id,
       requester_name: name,
       requester_phone: phone,
@@ -401,7 +403,7 @@
       requested_date: dateStr(state.selectedDate),
       requested_time: state.selectedTime,
       status: 'pending'
-    }).select().single();
+    });
 
     submitBtn.disabled = false;
     submitBtn.textContent = 'Request Appointment';
@@ -417,7 +419,7 @@
       return;
     }
 
-    document.getElementById('refCode').textContent = 'Ref: ' + data.id.slice(0,8).toUpperCase();
+    document.getElementById('refCode').textContent = 'Ref: ' + newId.slice(0,8).toUpperCase();
     goToStep(4);
   }
   window.submitBooking = submitBooking;
