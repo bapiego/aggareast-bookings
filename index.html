@@ -335,11 +335,9 @@
     if(!oh){ grid.innerHTML = '<div class="empty-note">No office hours on this day.</div>'; return; }
 
     const ds = dateStr(state.selectedDate);
-    const { data: booked } = await supabase.from('appointments')
-      .select('requested_time')
-      .eq('officer_id', state.selectedOfficer.id)
-      .eq('requested_date', ds)
-      .in('status', ['pending','confirmed','rescheduled']);
+    const { data: booked } = await supabase.rpc('public_taken_slots', {
+      p_officer_id: state.selectedOfficer.id, p_date: ds
+    });
     const bookedTimes = new Set((booked||[]).map(b=>b.requested_time.slice(0,5)));
 
     const [sh,sm] = oh.start_time.split(':').map(Number);
