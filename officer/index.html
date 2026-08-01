@@ -292,14 +292,19 @@
     }).join('');
   }
 
+  async function notifyStatus(id, kind){
+    try { await supabase.functions.invoke('send-status-sms', { body: { appointment_id: id, kind } }); }
+    catch(e){ /* notification failure shouldn't block the action */ }
+  }
+
   window.doConfirm = async function(id){
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'confirmed', p_note: null });
-    if(!error) await renderAppointments();
+    if(!error){ await notifyStatus(id, 'confirmed'); await renderAppointments(); }
   };
   window.doCancel = async function(id){
     if(!confirm('Cancel this appointment?')) return;
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'cancelled', p_note: null });
-    if(!error) await renderAppointments();
+    if(!error){ await notifyStatus(id, 'cancelled'); await renderAppointments(); }
   };
   window.doComplete = async function(id){
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'completed', p_note: null });
@@ -330,6 +335,7 @@
       return;
     }
     closeModal('rescheduleModal');
+    await notifyStatus(rescheduleTargetId, 'rescheduled');
     await renderAppointments();
   };
 
