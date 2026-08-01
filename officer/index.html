@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Officer Dashboard — AG GAER Appointments</title>
+<style>
+  :root{
+    --navy:#2F3080; --navy-dark:#232566; --gold:#EEDF10;
+    --lavender:#B4B8DA; --lavender-light:#E7E8F3; --white:#FFFFFF; --ink:#1A1A1A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; font-family:"Calibri","Segoe UI",system-ui,sans-serif; color:var(--ink);
+    background:linear-gradient(180deg,var(--navy) 0%, var(--navy) 130px, var(--lavender-light) 130px, var(--lavender-light) 100%);
+    padding:0 16px 60px;
+  }
+  h1,h2,h3{ font-family:"Cambria","Georgia",serif; margin:0; }
+  .wrap{ max-width:640px; margin:0 auto; }
+
+  header.brand{ text-align:center; padding:26px 0 14px; color:var(--white); }
+  header.brand .region{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:700; }
+  header.brand h1{ font-size:20px; font-weight:700; margin-top:2px; }
+
+  .card{ background:var(--white); border-radius:var(--radius); margin-top:16px; padding:22px; box-shadow:0 6px 20px rgba(35,37,102,0.1); }
+
+  /* LOGIN */
+  #loginCard label{ display:block; font-size:13px; font-weight:700; color:var(--navy); margin:14px 0 5px; }
+  #loginCard select, #loginCard input{
+    width:100%; padding:11px 12px; font-size:15px; border:1.5px solid var(--lavender); border-radius:8px; font-family:inherit;
+  }
+  #loginCard select:focus, #loginCard input:focus{ outline:none; border-color:var(--navy); }
+  button.primary{ background:var(--navy); color:var(--white); border:none; padding:13px; border-radius:8px; font-weight:700; font-size:15px; cursor:pointer; width:100%; margin-top:18px; }
+  button.primary:hover{ background:var(--navy-dark); }
+  button.primary:disabled{ background:#ccc; cursor:not-allowed; }
+  button.secondary{ background:var(--lavender-light); color:var(--navy); border:none; padding:9px 14px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; }
+  button.danger{ background:#FDECEC; color:#9B2C2C; border:none; padding:9px 14px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; }
+  .error{ background:#FDECEC; color:#9B2C2C; border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
+
+  /* TOPBAR */
+  #topbar{ display:none; justify-content:space-between; align-items:center; margin-top:18px; color:var(--white); }
+  #topbar .who{ font-family:"Cambria",serif; font-weight:700; font-size:17px; }
+  #topbar .title{ font-size:12px; opacity:.85; }
+  #topbar .actions{ display:flex; gap:8px; }
+
+  /* SECTION HEADERS */
+  .section-title{ font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--navy); font-weight:700; margin:22px 4px 10px; }
+  #dashboard{ display:none; }
+
+  .appt{ background:var(--white); border-radius:var(--radius); padding:16px 18px; margin-bottom:10px; box-shadow:0 4px 14px rgba(35,37,102,0.07); }
+  .appt .row1{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .appt .when{ font-family:"Cambria",serif; font-weight:700; color:var(--navy); font-size:16px; }
+  .badge{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+  .badge.pending{ background:#FFF3CD; color:#8A6D00; }
+  .badge.confirmed{ background:#DDF3E4; color:#1F7A3F; }
+  .badge.cancelled{ background:#FDECEC; color:#9B2C2C; }
+  .badge.completed{ background:var(--lavender-light); color:var(--navy); }
+  .appt .who{ margin-top:8px; font-size:14.5px; font-weight:700; }
+  .appt .meta{ font-size:13px; color:#555; margin-top:2px; }
+  .appt .purpose{ font-size:13.5px; margin-top:8px; line-height:1.5; }
+  .appt .proxy-tag{ margin-top:8px; font-size:12px; color:var(--navy); background:var(--lavender-light); display:inline-block; padding:4px 10px; border-radius:6px; }
+  .appt .btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .empty-note{ text-align:center; color:#666; font-size:13.5px; padding:14px; }
+
+  /* MODAL */
+  .modal-bg{ display:none; position:fixed; inset:0; background:rgba(26,26,26,.5); align-items:center; justify-content:center; padding:16px; z-index:10; }
+  .modal-bg.show{ display:flex; }
+  .modal{ background:var(--white); border-radius:var(--radius); padding:22px; width:100%; max-width:400px; }
+  .modal h3{ font-size:17px; color:var(--navy); margin-bottom:14px; }
+  .modal label{ display:block; font-size:13px; font-weight:700; color:var(--navy); margin:12px 0 5px; }
+  .modal input, .modal textarea{ width:100%; padding:10px 11px; font-size:15px; border:1.5px solid var(--lavender); border-radius:8px; font-family:inherit; }
+  .modal .btn-row{ display:flex; gap:10px; margin-top:18px; }
+  .modal .btn-row button{ flex:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div class="region">Greater Accra East Region</div>
+    <h1>Officer Dashboard</h1>
+  </header>
+
+  <div id="topbar">
+    <div>
+      <div class="who" id="whoName"></div>
+      <div class="title" id="whoTitle"></div>
+    </div>
+    <div class="actions">
+      <button class="secondary" onclick="openPinModal()">Change PIN</button>
+      <button class="danger" onclick="logout()">Log out</button>
+    </div>
+  </div>
+
+  <div class="card" id="loginCard">
+    <h2>Sign in</h2>
+    <label for="officerSelect">Officer</label>
+    <select id="officerSelect"></select>
+    <label for="pinInput">PIN</label>
+    <input id="pinInput" type="password" inputmode="numeric" placeholder="6-digit PIN" />
+    <div id="loginError"></div>
+    <button class="primary" onclick="login()">Sign In</button>
+  </div>
+
+  <div id="dashboard">
+    <div class="section-title">Needs your action</div>
+    <div id="pendingList"></div>
+
+    <div class="section-title">Upcoming</div>
+    <div id="upcomingList"></div>
+
+    <div class="section-title">Past</div>
+    <div id="pastList"></div>
+  </div>
+</div>
+
+<!-- Reschedule Modal -->
+<div class="modal-bg" id="rescheduleModal">
+  <div class="modal">
+    <h3>Reschedule appointment</h3>
+    <label>New date</label>
+    <input type="date" id="rNewDate" />
+    <label>New time</label>
+    <input type="time" id="rNewTime" />
+    <label>Note (optional)</label>
+    <textarea id="rNote" rows="2" placeholder="Reason for rescheduling"></textarea>
+    <div id="rescheduleError"></div>
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('rescheduleModal')">Cancel</button>
+      <button class="primary" style="margin-top:0" onclick="confirmReschedule()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change PIN Modal -->
+<div class="modal-bg" id="pinModal">
+  <div class="modal">
+    <h3>Change your PIN</h3>
+    <label>New PIN (at least 6 digits)</label>
+    <input type="password" inputmode="numeric" id="newPin1" />
+    <label>Confirm new PIN</label>
+    <input type="password" inputmode="numeric" id="newPin2" />
+    <div id="pinError"></div>
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('pinModal')">Cancel</button>
+      <button class="primary" style="margin-top:0" onclick="confirmChangePin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const SUPABASE_URL = 'https://fdcpvocferfjfvwbzhhe.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkY3B2b2NmZXJmamZ2d2J6aGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDk0NTgsImV4cCI6MjEwMTA4NTQ1OH0.j_6nhUKOjwesGGHMubgHvHzOg4184pTQ9e9Djnz-KwE';
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Fixed email convention set up when the staff logins were created
+  const EMAIL_BY_TITLE = {
+    'Regional Superintendent': 'rs@aggareast-bookings.internal',
+    'Regional Secretary': 'rsec@aggareast-bookings.internal',
+    'Regional Treasurer': 'rtreas@aggareast-bookings.internal'
+  };
+
+  let officers = [];
+  let myProfile = null;
+  let rescheduleTargetId = null;
+
+  async function loadOfficersIntoSelect(){
+    const { data } = await supabase.from('officers').select('*').eq('active', true).order('sort_order');
+    officers = data || [];
+    const sel = document.getElementById('officerSelect');
+    sel.innerHTML = officers.map(o => `<option value="${o.id}">${o.full_name} — ${o.title}</option>`).join('');
+  }
+
+  window.login = async function(){
+    const officerId = document.getElementById('officerSelect').value;
+    const pin = document.getElementById('pinInput').value.trim();
+    const errEl = document.getElementById('loginError');
+    errEl.innerHTML = '';
+    const officer = officers.find(o => o.id === officerId);
+    if(!officer || !pin){ errEl.innerHTML = '<div class="error">Please select your name and enter your PIN.</div>'; return; }
+
+    const email = EMAIL_BY_TITLE[officer.title];
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
+    if(error){ errEl.innerHTML = '<div class="error">Incorrect PIN. Please try again.</div>'; return; }
+
+    await loadDashboard();
+  };
+
+  window.logout = async function(){
+    await supabase.auth.signOut();
+    myProfile = null;
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('topbar').style.display = 'none';
+    document.getElementById('loginCard').style.display = 'block';
+    document.getElementById('pinInput').value = '';
+  };
+
+  async function loadDashboard(){
+    const { data: { user } } = await supabase.auth.getUser();
+    if(!user) return;
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if(!profile || profile.role !== 'officer'){
+      document.getElementById('loginError').innerHTML = '<div class="error">This login is not set up as an officer account.</div>';
+      await supabase.auth.signOut();
+      return;
+    }
+    myProfile = profile;
+    const officer = officers.find(o => o.id === profile.officer_id);
+
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('topbar').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('whoName').textContent = officer.full_name;
+    document.getElementById('whoTitle').textContent = officer.title;
+
+    await renderAppointments();
+  }
+
+  function fmtDate(d){
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short', year:'numeric'});
+  }
+  function fmtTime(t){
+    const [h,m] = t.split(':').map(Number);
+    const ampm = h>=12 ? 'PM':'AM';
+    const h12 = ((h+11)%12)+1;
+    return `${h12}:${m.toString().padStart(2,'0')} ${ampm}`;
+  }
+
+  async function renderAppointments(){
+    const { data: appts } = await supabase.from('appointments')
+      .select('*').eq('officer_id', myProfile.officer_id)
+      .order('requested_date', { ascending: true }).order('requested_time', { ascending: true });
+
+    const ids = (appts||[]).map(a=>a.id);
+    let latestProxyByAppt = {};
+    if(ids.length){
+      const { data: logs } = await supabase.from('audit_log')
+        .select('*').in('appointment_id', ids).order('created_at', { ascending: false });
+      (logs||[]).forEach(l=>{
+        if(l.actor_role !== 'officer' && !latestProxyByAppt[l.appointment_id]){
+          latestProxyByAppt[l.appointment_id] = l;
+        }
+      });
+    }
+
+    const todayStr = new Date().toISOString().slice(0,10);
+    const pending = [], upcoming = [], past = [];
+    (appts||[]).forEach(a=>{
+      if(a.status === 'pending') pending.push(a);
+      else if(a.status === 'cancelled' || a.status === 'completed' || a.requested_date < todayStr) past.push(a);
+      else upcoming.push(a);
+    });
+
+    renderList('pendingList', pending, latestProxyByAppt, true);
+    renderList('upcomingList', upcoming, latestProxyByAppt, true);
+    renderList('pastList', past.reverse(), latestProxyByAppt, true);
+  }
+
+  function renderList(containerId, list, proxyMap, showActions){
+    const el = document.getElementById(containerId);
+    if(!list.length){ el.innerHTML = '<div class="empty-note">Nothing here.</div>'; return; }
+    el.innerHTML = list.map(a => {
+      const proxy = proxyMap[a.id];
+      const proxyTag = proxy ? `<div class="proxy-tag">${proxy.action[0].toUpperCase()+proxy.action.slice(1)} by ${proxy.actor_display_name} (${proxy.actor_role})</div>` : '';
+      let btns = '';
+      const isFuture = a.requested_date >= new Date().toISOString().slice(0,10);
+      if(showActions){
+        if(a.status === 'confirmed' && !isFuture){
+          btns += `<button class="secondary" onclick="doComplete('${a.id}')">Mark Completed</button>`;
+        }
+        if(isFuture && a.status === 'pending'){
+          btns += `<button class="secondary" onclick="doConfirm('${a.id}')">Confirm</button>`;
+        }
+        if(isFuture && (a.status === 'pending' || a.status === 'confirmed')){
+          btns += `<button class="secondary" onclick="openReschedule('${a.id}')">Reschedule</button>`;
+          btns += `<button class="danger" onclick="doCancel('${a.id}')">Cancel</button>`;
+        }
+      }
+      return `<div class="appt">
+        <div class="row1">
+          <div class="when">${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))}</div>
+          <div class="badge ${a.status}">${a.status}</div>
+        </div>
+        <div class="who">${a.requester_name}</div>
+        <div class="meta">${a.requester_phone} · ${a.requester_church}</div>
+        ${a.purpose ? `<div class="purpose">${a.purpose}</div>` : ''}
+        ${proxyTag}
+        ${btns ? `<div class="btns">${btns}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  window.doConfirm = async function(id){
+    const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'confirmed', p_note: null });
+    if(!error) await renderAppointments();
+  };
+  window.doCancel = async function(id){
+    if(!confirm('Cancel this appointment?')) return;
+    const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'cancelled', p_note: null });
+    if(!error) await renderAppointments();
+  };
+  window.doComplete = async function(id){
+    const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'completed', p_note: null });
+    if(!error) await renderAppointments();
+  };
+
+  window.openReschedule = function(id){
+    rescheduleTargetId = id;
+    document.getElementById('rNewDate').value = '';
+    document.getElementById('rNewTime').value = '';
+    document.getElementById('rNote').value = '';
+    document.getElementById('rescheduleError').innerHTML = '';
+    document.getElementById('rescheduleModal').classList.add('show');
+  };
+  window.confirmReschedule = async function(){
+    const date = document.getElementById('rNewDate').value;
+    const time = document.getElementById('rNewTime').value;
+    const note = document.getElementById('rNote').value.trim();
+    const errEl = document.getElementById('rescheduleError');
+    if(!date || !time){ errEl.innerHTML = '<div class="error">Please choose a new date and time.</div>'; return; }
+    const { error } = await supabase.rpc('reschedule_appointment', {
+      p_appointment_id: rescheduleTargetId, p_new_date: date, p_new_time: time + ':00', p_note: note || null
+    });
+    if(error){
+      errEl.innerHTML = error.code === '23505'
+        ? '<div class="error">That officer already has an appointment at that time.</div>'
+        : '<div class="error">Something went wrong. Please try again.</div>';
+      return;
+    }
+    closeModal('rescheduleModal');
+    await renderAppointments();
+  };
+
+  window.openPinModal = function(){
+    document.getElementById('newPin1').value = '';
+    document.getElementById('newPin2').value = '';
+    document.getElementById('pinError').innerHTML = '';
+    document.getElementById('pinModal').classList.add('show');
+  };
+  window.confirmChangePin = async function(){
+    const p1 = document.getElementById('newPin1').value;
+    const p2 = document.getElementById('newPin2').value;
+    const errEl = document.getElementById('pinError');
+    if(p1.length < 6){ errEl.innerHTML = '<div class="error">PIN must be at least 6 characters.</div>'; return; }
+    if(p1 !== p2){ errEl.innerHTML = '<div class="error">PINs do not match.</div>'; return; }
+    const { error } = await supabase.auth.updateUser({ password: p1 });
+    if(error){ errEl.innerHTML = '<div class="error">Could not update PIN. Please try again.</div>'; return; }
+    closeModal('pinModal');
+    alert('PIN updated.');
+  };
+
+  window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
+
+  async function init(){
+    await loadOfficersIntoSelect();
+    const { data: { session } } = await supabase.auth.getSession();
+    if(session) await loadDashboard();
+  }
+  init();
+</script>
+</body>
+</html>
