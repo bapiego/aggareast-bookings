@@ -73,6 +73,31 @@
   .note-input-row{ display:flex; gap:8px; margin-top:8px; }
   .note-input-row input{ flex:1; padding:8px 10px; font-size:13px; border:1.5px solid var(--lavender); border-radius:8px; }
   .note-input-row button{ padding:8px 12px; }
+
+  /* DRAMATIC ALERT — forces acknowledgment, can't be missed */
+  .alert-overlay{
+    display:none; position:fixed; inset:0; background:rgba(20,20,50,.75);
+    align-items:center; justify-content:center; padding:20px; z-index:1000;
+    animation:alertFadeIn .2s ease-out;
+  }
+  .alert-overlay.show{ display:flex; }
+  @keyframes alertFadeIn{ from{opacity:0;} to{opacity:1;} }
+  @keyframes alertPulse{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.02);} }
+  .alert-card{
+    background:var(--white); border-radius:14px; padding:32px 26px; width:100%; max-width:400px;
+    text-align:center; border:4px solid var(--gold); box-shadow:0 20px 60px rgba(0,0,0,.4);
+    animation:alertPulse 1s ease-in-out infinite;
+  }
+  .alert-card .icon{ font-size:40px; margin-bottom:10px; }
+  .alert-card h2{ font-size:20px; color:var(--navy); margin-bottom:8px; }
+  .alert-card .detail{ font-size:15px; color:#333; margin-bottom:20px; }
+
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--navy); color:var(--white); padding:14px 20px; border-radius:10px;
+    font-size:14px; font-weight:700; z-index:1000; box-shadow:0 8px 24px rgba(0,0,0,.3);
+    max-width:90vw; text-align:center;
+  }
   .appt .who{ margin-top:8px; font-size:14.5px; font-weight:700; }
   .appt .meta{ font-size:13px; color:#555; margin-top:2px; }
   .appt .purpose{ font-size:13.5px; margin-top:8px; line-height:1.5; }
@@ -150,6 +175,16 @@
         <button class="secondary" onclick="sendGeneralNote()">Send</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Dramatic "not ready" alert — must be explicitly dismissed -->
+<div class="alert-overlay" id="heldAlert">
+  <div class="alert-card">
+    <div class="icon">⏸️</div>
+    <h2>Front desk: not ready</h2>
+    <div class="detail" id="heldAlertDetail"></div>
+    <button class="primary" style="margin-top:0" onclick="dismissHeldAlert()">OK, I'll call someone else</button>
   </div>
 </div>
 
@@ -281,14 +316,81 @@
     document.getElementById('queueView').style.display = tab==='queue' ? 'block' : 'none';
   };
 
+  // ---------- Attention: sound + browser notification + full-screen alert ----------
+  function playChime(urgent){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const freqs = urgent ? [660, 660, 660] : [880, 1108];
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + i*0.18);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i*0.18 + 0.4);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i*0.18); osc.stop(ctx.currentTime + i*0.18 + 0.4);
+      });
+    } catch(e){ /* audio not available, fine */ }
+  }
+  function notifyBrowser(title, body){
+    if('Notification' in window && Notification.permission === 'granted'){
+      try { new Notification(title, { body, tag: 'aggareast-queue' }); } catch(e){}
+    }
+    if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  }
+  function requestNotifyPermission(){
+    if('Notification' in window && Notification.permission === 'default'){
+      Notification.requestPermission();
+    }
+  }
+  function showToast(msg){
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  let heldAlertQueue = [];
+  function queueHeldAlert(entry){
+    heldAlertQueue.push(entry);
+    playChime(true);
+    notifyBrowser('Front desk: not ready', `${entry.visitor_name} isn't available right now.`);
+    if(!document.getElementById('heldAlert').classList.contains('show')) showNextHeldAlert();
+  }
+  function showNextHeldAlert(){
+    if(!heldAlertQueue.length) return;
+    const entry = heldAlertQueue[0];
+    document.getElementById('heldAlertDetail').textContent =
+      `${entry.visitor_name} isn't available right now.` + (entry.held_note ? ` "${entry.held_note}"` : '');
+    document.getElementById('heldAlert').classList.add('show');
+  }
+  window.dismissHeldAlert = function(){
+    heldAlertQueue.shift();
+    document.getElementById('heldAlert').classList.remove('show');
+    setTimeout(showNextHeldAlert, 300);
+  };
+
   // ---------- Realtime: any change to the queue or notes just re-renders ----------
   let realtimeSubscribed = false;
   function subscribeRealtime(){
     if(realtimeSubscribed) return;
     realtimeSubscribed = true;
+    requestNotifyPermission();
     supabase.channel('officer-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_entries' }, () => renderQueue())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes' }, () => renderNotesThread())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'queue_entries', filter: `officer_id=eq.${myProfile.officer_id}` }, (payload) => {
+        if(payload.new.status === 'held' && payload.old.status !== 'held'){
+          queueHeldAlert(payload.new);
+        } else if(payload.new.status === 'waiting' && payload.old.status === 'held'){
+          playChime(false);
+          notifyBrowser('Ready now', `${payload.new.visitor_name} is ready to be seen.`);
+          showToast(`${payload.new.visitor_name} is ready now.`);
+        }
+        renderQueue();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'queue_entries', filter: `officer_id=eq.${myProfile.officer_id}` }, () => renderQueue())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes', filter: `officer_id=eq.${myProfile.officer_id}` }, () => renderNotesThread())
       .subscribe();
   }
 
