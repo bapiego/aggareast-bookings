@@ -419,6 +419,14 @@
 
     document.getElementById('refCode').textContent = 'Ref: ' + newId.slice(0,8).toUpperCase();
     goToStep(4);
+
+    // Fire-and-forget: send SMS confirmation with the manage link. Booking
+    // has already succeeded regardless of whether this call works.
+    fetch(`${SUPABASE_URL}/functions/v1/send-appointment-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appointment_id: newId })
+    }).catch(()=>{});
   }
   window.submitBooking = submitBooking;
 
