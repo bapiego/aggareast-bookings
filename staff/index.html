@@ -65,6 +65,18 @@
   .badge.confirmed{ background:#DDF3E4; color:#1F7A3F; }
   .badge.cancelled{ background:#FDECEC; color:#9B2C2C; }
   .badge.completed{ background:var(--lavender-light); color:var(--navy); }
+  .badge.waiting{ background:#E7E8F3; color:#2F3080; }
+  .badge.called{ background:#DDF3E4; color:#1F7A3F; }
+  .badge.held{ background:#FDE9D0; color:#9A5B00; }
+  .badge.no_show{ background:#FDECEC; color:#9B2C2C; }
+
+  .queue-alert{ border:2px solid var(--gold); }
+  .note-thread{ max-height:180px; overflow-y:auto; margin-top:10px; padding:8px; background:var(--lavender-light); border-radius:8px; }
+  .note-line{ font-size:12.5px; margin-bottom:6px; }
+  .note-line b{ color:var(--navy); }
+  .note-input-row{ display:flex; gap:8px; margin-top:8px; }
+  .note-input-row input{ flex:1; padding:8px 10px; font-size:13px; border:1.5px solid var(--lavender); border-radius:8px; }
+  .note-input-row button{ padding:8px 12px; }
   .appt .who{ margin-top:8px; font-size:14.5px; font-weight:700; }
   .appt .meta{ font-size:13px; color:#555; margin-top:2px; }
   .appt .purpose{ font-size:13.5px; margin-top:8px; line-height:1.5; }
@@ -100,6 +112,7 @@
       <div class="title" id="whoTitle"></div>
     </div>
     <div class="actions">
+      <button class="gold" onclick="openCheckIn()">+ Check In</button>
       <button class="gold" onclick="openNewAppt()">+ New Appointment</button>
       <button class="secondary" onclick="openPinModal()">Change PIN</button>
       <button class="danger" onclick="logout()">Log out</button>
@@ -121,12 +134,29 @@
 
   <div id="dashboard">
     <div class="tabs">
-      <button class="tab active" id="tabAppts" onclick="switchTab('appts')">Appointments</button>
+      <button class="tab active" id="tabFrontDesk" onclick="switchTab('frontdesk')">Front Desk</button>
+      <button class="tab" id="tabAppts" onclick="switchTab('appts')">Appointments</button>
       <button class="tab" id="tabLog" onclick="switchTab('log')">Audit Log</button>
       <button class="tab" id="tabPins" onclick="switchTab('pins')" style="display:none">Staff PINs</button>
     </div>
 
-    <div id="apptsView">
+    <div id="frontDeskView">
+      <div class="chip-row" id="fdOfficerChips"></div>
+      <div class="section-title">Being seen now</div>
+      <div id="fdCalled"></div>
+      <div class="section-title">Held — not ready</div>
+      <div id="fdHeld"></div>
+      <div class="section-title">Waiting</div>
+      <div id="fdWaiting"></div>
+      <div class="section-title">Notes with officer</div>
+      <div id="fdNotesThread" class="note-thread"></div>
+      <div class="note-input-row">
+        <input id="fdNoteInput" type="text" placeholder="Send a quick note…" />
+        <button class="secondary" onclick="sendGeneralNote()">Send</button>
+      </div>
+    </div>
+
+    <div id="apptsView" style="display:none">
       <div class="chip-row" id="officerChips"></div>
       <div class="section-title">Needs action</div>
       <div id="pendingList"></div>
@@ -176,6 +206,60 @@
     <div class="btn-row">
       <button class="secondary" onclick="closeModal('newApptModal')">Cancel</button>
       <button class="primary" style="margin-top:0" onclick="submitNewAppt()">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Check In Modal -->
+<div class="modal-bg" id="checkInModal">
+  <div class="modal">
+    <h3>Check in a visitor</h3>
+    <label>Phone number (to look up a booking, optional)</label>
+    <div style="display:flex; gap:8px;">
+      <input id="ciPhone" type="tel" style="flex:1" />
+      <button class="secondary" onclick="lookupBooking()">Find</button>
+    </div>
+    <div id="ciLookupResult"></div>
+    <label>Officer</label>
+    <select id="ciOfficer"></select>
+    <label>Visitor name</label>
+    <input id="ciName" type="text" />
+    <label>Church / District</label>
+    <input id="ciChurch" type="text" />
+    <label>Purpose</label>
+    <textarea id="ciPurpose" rows="2"></textarea>
+    <div id="checkInError"></div>
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('checkInModal')">Cancel</button>
+      <button class="primary" style="margin-top:0" onclick="submitCheckIn()">Check In</button>
+    </div>
+  </div>
+</div>
+
+<!-- Per-visitor Note Modal -->
+<div class="modal-bg" id="visitorNoteModal">
+  <div class="modal">
+    <h3>Note — <span id="vnName"></span></h3>
+    <div id="vnThread" class="note-thread"></div>
+    <div class="note-input-row">
+      <input id="vnInput" type="text" placeholder="Write a note about this visitor…" />
+      <button class="secondary" onclick="sendVisitorNote()">Send</button>
+    </div>
+    <div class="btn-row">
+      <button class="secondary" style="width:100%" onclick="closeModal('visitorNoteModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hold Reason Modal -->
+<div class="modal-bg" id="holdModal">
+  <div class="modal">
+    <h3>Mark not ready</h3>
+    <label>Why aren't they available right now? (optional)</label>
+    <input id="holdNote" type="text" placeholder="e.g. Stepped out, back in 10 min" />
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('holdModal')">Cancel</button>
+      <button class="primary" style="margin-top:0" onclick="confirmHold()">Confirm</button>
     </div>
   </div>
 </div>
@@ -309,9 +393,14 @@
 
     renderOfficerChips('officerChips', apptFilterOfficerId, selectApptOfficer);
     renderOfficerChips('logOfficerChips', logFilterOfficerId, selectLogOfficer);
+    renderOfficerChips('fdOfficerChips', fdOfficerId, selectFdOfficer);
+
+    document.getElementById('ciOfficer').innerHTML = officers.map(o => `<option value="${o.id}">${o.full_name} — ${o.title}</option>`).join('');
 
     await renderAppointments();
     await renderLog();
+    await renderFrontDesk();
+    subscribeRealtime();
   }
 
   function selectApptOfficer(id){
@@ -324,15 +413,204 @@
     renderOfficerChips('logOfficerChips', id, selectLogOfficer);
     renderLog();
   }
+  function selectFdOfficer(id){
+    fdOfficerId = id;
+    renderOfficerChips('fdOfficerChips', id, selectFdOfficer);
+    renderFrontDesk();
+    renderNotesThread();
+  }
 
   window.switchTab = function(tab){
+    document.getElementById('tabFrontDesk').classList.toggle('active', tab==='frontdesk');
     document.getElementById('tabAppts').classList.toggle('active', tab==='appts');
     document.getElementById('tabLog').classList.toggle('active', tab==='log');
     document.getElementById('tabPins').classList.toggle('active', tab==='pins');
+    document.getElementById('frontDeskView').style.display = tab==='frontdesk' ? 'block' : 'none';
     document.getElementById('apptsView').style.display = tab==='appts' ? 'block' : 'none';
     document.getElementById('logView').style.display = tab==='log' ? 'block' : 'none';
     document.getElementById('pinsView').style.display = tab==='pins' ? 'block' : 'none';
   };
+
+  // ---------- Realtime: any change to the queue or notes just re-renders ----------
+  let realtimeSubscribed = false;
+  function subscribeRealtime(){
+    if(realtimeSubscribed) return;
+    realtimeSubscribed = true;
+    supabase.channel('front-desk')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_entries' }, () => renderFrontDesk())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes' }, () => renderNotesThread())
+      .subscribe();
+  }
+
+  // ---------- Front Desk / walk-in queue ----------
+  let fdOfficerId = 'all';
+  let fdEntries = [];
+
+  function fmtWhen(ts){
+    return new Date(ts).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  async function renderFrontDesk(){
+    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+    let q = supabase.from('queue_entries').select('*')
+      .gte('checked_in_at', startOfToday.toISOString())
+      .in('status', ['waiting','called','held'])
+      .order('checked_in_at', { ascending: true });
+    if(fdOfficerId !== 'all') q = q.eq('officer_id', fdOfficerId);
+    const { data } = await q;
+    fdEntries = data || [];
+
+    renderQueueSection('fdCalled', fdEntries.filter(e => e.status === 'called'), true);
+    renderQueueSection('fdHeld', fdEntries.filter(e => e.status === 'held'), true);
+    renderQueueSection('fdWaiting', fdEntries.filter(e => e.status === 'waiting'), false);
+  }
+
+  function renderQueueSection(containerId, list, alert){
+    const el = document.getElementById(containerId);
+    if(!list.length){ el.innerHTML = '<div class="empty-note">None right now.</div>'; return; }
+    el.innerHTML = list.map(e => {
+      let btns = '';
+      if(e.status === 'called'){
+        btns += `<button class="danger" onclick="openHold('${e.id}')">Not Ready</button>`;
+        btns += `<button class="secondary" onclick="doQueueDone('${e.id}')">Mark Done</button>`;
+      } else if(e.status === 'held'){
+        btns += `<button class="secondary" onclick="doQueueReady('${e.id}')">Ready Now</button>`;
+      } else if(e.status === 'waiting'){
+        btns += `<button class="danger" onclick="doQueueNoShow('${e.id}')">No-show</button>`;
+      }
+      btns += `<button class="secondary" onclick="openVisitorNote('${e.id}','${e.officer_id}','${e.visitor_name.replace(/'/g,"\\'")}')">Note</button>`;
+      btns += `<button class="danger" onclick="doQueueCancel('${e.id}')">Cancel</button>`;
+      const heldNote = e.status === 'held' && e.held_note ? `<div class="purpose">"${e.held_note}"</div>` : '';
+      return `<div class="appt ${alert ? 'queue-alert' : ''}">
+        <div class="row1">
+          <div>
+            <div class="when">${e.visitor_name}</div>
+            <div class="officer-name">${officerName(e.officer_id)} · checked in ${fmtWhen(e.checked_in_at)}</div>
+          </div>
+          <div class="badge ${e.status}">${e.status.replace('_',' ')}</div>
+        </div>
+        <div class="meta">${e.visitor_phone} · ${e.visitor_church || ''}</div>
+        ${e.purpose ? `<div class="purpose">${e.purpose}</div>` : ''}
+        ${heldNote}
+        <div class="btns">${btns}</div>
+      </div>`;
+    }).join('');
+  }
+
+  window.doQueueDone = async (id) => { await supabase.rpc('queue_mark_done', { p_entry_id: id }); };
+  window.doQueueReady = async (id) => { await supabase.rpc('queue_mark_ready', { p_entry_id: id }); };
+  window.doQueueNoShow = async (id) => { if(confirm('Mark as no-show?')) await supabase.rpc('queue_no_show', { p_entry_id: id }); };
+  window.doQueueCancel = async (id) => {
+    const reason = prompt('Reason for cancelling (optional):') || null;
+    await supabase.rpc('queue_cancel', { p_entry_id: id, p_reason: reason });
+  };
+
+  let holdTargetId = null;
+  window.openHold = (id) => {
+    holdTargetId = id;
+    document.getElementById('holdNote').value = '';
+    document.getElementById('holdModal').classList.add('show');
+  };
+  window.confirmHold = async () => {
+    const note = document.getElementById('holdNote').value.trim() || null;
+    await supabase.rpc('queue_mark_held', { p_entry_id: holdTargetId, p_note: note });
+    closeModal('holdModal');
+  };
+
+  // ---------- Check-in ----------
+  window.openCheckIn = function(){
+    document.getElementById('ciPhone').value = '';
+    document.getElementById('ciName').value = '';
+    document.getElementById('ciChurch').value = '';
+    document.getElementById('ciPurpose').value = '';
+    document.getElementById('ciLookupResult').innerHTML = '';
+    document.getElementById('checkInError').innerHTML = '';
+    checkInLinkedAppointmentId = null;
+    document.getElementById('checkInModal').classList.add('show');
+  };
+
+  let checkInLinkedAppointmentId = null;
+  window.lookupBooking = async function(){
+    const phone = document.getElementById('ciPhone').value.trim();
+    const resEl = document.getElementById('ciLookupResult');
+    if(!phone){ resEl.innerHTML = ''; return; }
+    const todayStr = new Date().toISOString().slice(0,10);
+    const { data } = await supabase.from('appointments').select('*')
+      .ilike('requester_phone', `%${phone.replace(/\D/g,'').slice(-9)}%`)
+      .eq('requested_date', todayStr)
+      .in('status', ['pending','confirmed'])
+      .limit(1);
+    if(data && data.length){
+      const a = data[0];
+      checkInLinkedAppointmentId = a.id;
+      document.getElementById('ciOfficer').value = a.officer_id;
+      document.getElementById('ciName').value = a.requester_name;
+      document.getElementById('ciChurch').value = a.requester_church || '';
+      document.getElementById('ciPurpose').value = a.purpose || '';
+      resEl.innerHTML = `<div class="info">Found today's booking for ${a.requester_name} — fields filled in.</div>`;
+    } else {
+      checkInLinkedAppointmentId = null;
+      resEl.innerHTML = '<div class="info">No matching booking for today — fill in details for a walk-in.</div>';
+    }
+  };
+
+  window.submitCheckIn = async function(){
+    const officerId = document.getElementById('ciOfficer').value;
+    const name = document.getElementById('ciName').value.trim();
+    const phone = document.getElementById('ciPhone').value.trim();
+    const church = document.getElementById('ciChurch').value.trim();
+    const purpose = document.getElementById('ciPurpose').value.trim();
+    const errEl = document.getElementById('checkInError');
+    if(!name || !phone){ errEl.innerHTML = '<div class="error">Name and phone are required.</div>'; return; }
+
+    const { error } = await supabase.rpc('checkin_visitor', {
+      p_officer_id: officerId, p_appointment_id: checkInLinkedAppointmentId,
+      p_name: name, p_phone: phone, p_church: church, p_purpose: purpose
+    });
+    if(error){ errEl.innerHTML = '<div class="error">Something went wrong. Please try again.</div>'; return; }
+    closeModal('checkInModal');
+  };
+
+  // ---------- Notes ----------
+  async function renderNotesThread(){
+    const el = document.getElementById('fdNotesThread');
+    if(fdOfficerId === 'all'){ el.innerHTML = '<div class="empty-note">Select an officer above to view notes.</div>'; return; }
+    const { data } = await supabase.from('queue_notes').select('*')
+      .eq('officer_id', fdOfficerId).is('queue_entry_id', null)
+      .order('created_at', { ascending: true }).limit(50);
+    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    el.scrollTop = el.scrollHeight;
+  }
+  window.sendGeneralNote = async function(){
+    if(fdOfficerId === 'all'){ alert('Select an officer first.'); return; }
+    const input = document.getElementById('fdNoteInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    input.value = '';
+    await supabase.rpc('send_queue_note', { p_officer_id: fdOfficerId, p_entry_id: null, p_message: msg });
+  };
+
+  let visitorNoteEntryId = null, visitorNoteOfficerId = null;
+  window.openVisitorNote = async function(entryId, officerId, name){
+    visitorNoteEntryId = entryId; visitorNoteOfficerId = officerId;
+    document.getElementById('vnName').textContent = name;
+    document.getElementById('vnInput').value = '';
+    await renderVisitorNoteThread();
+    document.getElementById('visitorNoteModal').classList.add('show');
+  };
+  async function renderVisitorNoteThread(){
+    const { data } = await supabase.from('queue_notes').select('*')
+      .eq('queue_entry_id', visitorNoteEntryId).order('created_at', { ascending: true });
+    document.getElementById('vnThread').innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+  }
+  window.sendVisitorNote = async function(){
+    const input = document.getElementById('vnInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    input.value = '';
+    await supabase.rpc('send_queue_note', { p_officer_id: visitorNoteOfficerId, p_entry_id: visitorNoteEntryId, p_message: msg });
+    await renderVisitorNoteThread();
+  }
 
   let resetPinTarget = null;
 
