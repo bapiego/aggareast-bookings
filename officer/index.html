@@ -56,6 +56,23 @@
   .badge.confirmed{ background:#DDF3E4; color:#1F7A3F; }
   .badge.cancelled{ background:#FDECEC; color:#9B2C2C; }
   .badge.completed{ background:var(--lavender-light); color:var(--navy); }
+  .badge.waiting{ background:#E7E8F3; color:#2F3080; }
+  .badge.called{ background:#DDF3E4; color:#1F7A3F; }
+  .badge.held{ background:#FDE9D0; color:#9A5B00; }
+  .badge.no_show{ background:#FDECEC; color:#9B2C2C; }
+  .queue-alert{ border:2px solid var(--gold); }
+  .info{ background:var(--lavender-light); color:var(--navy); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
+
+  .tabs{ display:flex; gap:8px; margin-top:20px; }
+  .tab{ background:var(--lavender-light); color:var(--navy); border:none; padding:9px 16px; border-radius:8px; font-weight:700; font-size:13.5px; cursor:pointer; }
+  .tab.active{ background:var(--navy); color:var(--white); }
+
+  .note-thread{ max-height:180px; overflow-y:auto; margin-top:10px; padding:8px; background:var(--lavender-light); border-radius:8px; }
+  .note-line{ font-size:12.5px; margin-bottom:6px; }
+  .note-line b{ color:var(--navy); }
+  .note-input-row{ display:flex; gap:8px; margin-top:8px; }
+  .note-input-row input{ flex:1; padding:8px 10px; font-size:13px; border:1.5px solid var(--lavender); border-radius:8px; }
+  .note-input-row button{ padding:8px 12px; }
   .appt .who{ margin-top:8px; font-size:14.5px; font-weight:700; }
   .appt .meta{ font-size:13px; color:#555; margin-top:2px; }
   .appt .purpose{ font-size:13.5px; margin-top:8px; line-height:1.5; }
@@ -103,14 +120,51 @@
   </div>
 
   <div id="dashboard">
-    <div class="section-title">Needs your action</div>
-    <div id="pendingList"></div>
+    <div class="tabs">
+      <button class="tab active" id="tabAppts" onclick="switchTab('appts')">Appointments</button>
+      <button class="tab" id="tabQueue" onclick="switchTab('queue')">Queue<span id="queueBadgeCount"></span></button>
+    </div>
 
-    <div class="section-title">Upcoming</div>
-    <div id="upcomingList"></div>
+    <div id="apptsView">
+      <div class="section-title">Needs your action</div>
+      <div id="pendingList"></div>
 
-    <div class="section-title">Past</div>
-    <div id="pastList"></div>
+      <div class="section-title">Upcoming</div>
+      <div id="upcomingList"></div>
+
+      <div class="section-title">Past</div>
+      <div id="pastList"></div>
+    </div>
+
+    <div id="queueView" style="display:none">
+      <div class="section-title">Waiting to see you</div>
+      <div id="qWaiting"></div>
+      <div class="section-title">Currently with you</div>
+      <div id="qCalled"></div>
+      <div class="section-title">Held by front desk</div>
+      <div id="qHeld"></div>
+      <div class="section-title">Notes with front desk</div>
+      <div id="qNotesThread" class="note-thread"></div>
+      <div class="note-input-row">
+        <input id="qNoteInput" type="text" placeholder="Send a quick note…" />
+        <button class="secondary" onclick="sendGeneralNote()">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Per-visitor Note Modal -->
+<div class="modal-bg" id="visitorNoteModal">
+  <div class="modal">
+    <h3>Note — <span id="vnName"></span></h3>
+    <div id="vnThread" class="note-thread"></div>
+    <div class="note-input-row">
+      <input id="vnInput" type="text" placeholder="Write a note about this visitor…" />
+      <button class="secondary" onclick="sendVisitorNote()">Send</button>
+    </div>
+    <div class="btn-row">
+      <button class="secondary" style="width:100%" onclick="closeModal('visitorNoteModal')">Close</button>
+    </div>
   </div>
 </div>
 
@@ -216,7 +270,141 @@
     document.getElementById('whoTitle').textContent = officer.title;
 
     await renderAppointments();
+    await renderQueue();
+    subscribeRealtime();
   }
+
+  window.switchTab = function(tab){
+    document.getElementById('tabAppts').classList.toggle('active', tab==='appts');
+    document.getElementById('tabQueue').classList.toggle('active', tab==='queue');
+    document.getElementById('apptsView').style.display = tab==='appts' ? 'block' : 'none';
+    document.getElementById('queueView').style.display = tab==='queue' ? 'block' : 'none';
+  };
+
+  // ---------- Realtime: any change to the queue or notes just re-renders ----------
+  let realtimeSubscribed = false;
+  function subscribeRealtime(){
+    if(realtimeSubscribed) return;
+    realtimeSubscribed = true;
+    supabase.channel('officer-queue')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_entries' }, () => renderQueue())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes' }, () => renderNotesThread())
+      .subscribe();
+  }
+
+  // ---------- Queue ----------
+  function fmtWhen(ts){ return new Date(ts).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }); }
+
+  async function renderQueue(){
+    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+    const { data } = await supabase.from('queue_entries').select('*')
+      .eq('officer_id', myProfile.officer_id)
+      .gte('checked_in_at', startOfToday.toISOString())
+      .in('status', ['waiting','called','held'])
+      .order('checked_in_at', { ascending: true });
+
+    const entries = data || [];
+    const waiting = entries.filter(e => e.status === 'waiting');
+    const called = entries.filter(e => e.status === 'called');
+    const held = entries.filter(e => e.status === 'held');
+
+    const badgeEl = document.getElementById('queueBadgeCount');
+    badgeEl.textContent = waiting.length ? ` (${waiting.length})` : '';
+
+    renderQueueSection('qWaiting', waiting, false);
+    renderQueueSection('qCalled', called, true);
+    renderQueueSection('qHeld', held, false);
+    await renderNotesThread();
+  }
+
+  function renderQueueSection(containerId, list, alert){
+    const el = document.getElementById(containerId);
+    if(!list.length){ el.innerHTML = '<div class="empty-note">Nobody here.</div>'; return; }
+    el.innerHTML = list.map(e => {
+      let btns = '';
+      if(e.status === 'waiting'){
+        btns += `<button class="secondary" onclick="doCallIn('${e.id}')">Call In</button>`;
+        if(e.appointment_id){
+          btns += `<button class="secondary" onclick="openQueueReschedule('${e.id}','${e.appointment_id}')">Reschedule</button>`;
+        }
+        btns += `<button class="danger" onclick="doQueueCancel('${e.id}')">Cancel</button>`;
+      } else if(e.status === 'called'){
+        btns += `<button class="secondary" onclick="doQueueDone('${e.id}')">Mark Done</button>`;
+      }
+      btns += `<button class="secondary" onclick="openVisitorNote('${e.id}','${e.visitor_name.replace(/'/g,"\\'")}')">Note</button>`;
+      const heldNote = e.status === 'held' && e.held_note ? `<div class="purpose">Front desk says: "${e.held_note}"</div>` : '';
+      return `<div class="appt ${alert ? 'queue-alert' : ''}">
+        <div class="row1">
+          <div class="when">${e.visitor_name}</div>
+          <div class="badge ${e.status}">${e.status.replace('_',' ')}</div>
+        </div>
+        <div class="meta">${e.visitor_phone} · ${e.visitor_church || ''} · checked in ${fmtWhen(e.checked_in_at)}</div>
+        ${e.purpose ? `<div class="purpose">${e.purpose}</div>` : ''}
+        ${heldNote}
+        <div class="btns">${btns}</div>
+      </div>`;
+    }).join('');
+  }
+
+  window.doCallIn = async (id) => {
+    const { error } = await supabase.rpc('queue_call_in', { p_entry_id: id });
+    if(error) alert('Could not call them in — please try again.');
+  };
+  window.doQueueDone = async (id) => { await supabase.rpc('queue_mark_done', { p_entry_id: id }); };
+  window.doQueueCancel = async (id) => {
+    const reason = prompt('Reason for cancelling (optional):') || null;
+    await supabase.rpc('queue_cancel', { p_entry_id: id, p_reason: reason });
+  };
+
+  let rescheduleQueueEntryId = null;
+  window.openQueueReschedule = function(entryId, appointmentId){
+    rescheduleTargetId = appointmentId;
+    rescheduleQueueEntryId = entryId;
+    document.getElementById('rNewDate').value = '';
+    document.getElementById('rNewTime').value = '';
+    document.getElementById('rNote').value = '';
+    document.getElementById('rescheduleError').innerHTML = '';
+    document.getElementById('rescheduleModal').classList.add('show');
+  };
+
+  // ---------- Notes ----------
+  async function renderNotesThread(){
+    const { data } = await supabase.from('queue_notes').select('*')
+      .eq('officer_id', myProfile.officer_id).is('queue_entry_id', null)
+      .order('created_at', { ascending: true }).limit(50);
+    const el = document.getElementById('qNotesThread');
+    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    el.scrollTop = el.scrollHeight;
+  }
+  window.sendGeneralNote = async function(){
+    const input = document.getElementById('qNoteInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    input.value = '';
+    await supabase.rpc('send_queue_note', { p_officer_id: myProfile.officer_id, p_entry_id: null, p_message: msg });
+  };
+
+  let visitorNoteEntryId = null;
+  window.openVisitorNote = async function(entryId, name){
+    visitorNoteEntryId = entryId;
+    document.getElementById('vnName').textContent = name;
+    document.getElementById('vnInput').value = '';
+    await renderVisitorNoteThread();
+    document.getElementById('visitorNoteModal').classList.add('show');
+  };
+  async function renderVisitorNoteThread(){
+    const { data } = await supabase.from('queue_notes').select('*')
+      .eq('queue_entry_id', visitorNoteEntryId).order('created_at', { ascending: true });
+    document.getElementById('vnThread').innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+  }
+  window.sendVisitorNote = async function(){
+    const input = document.getElementById('vnInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    input.value = '';
+    await supabase.rpc('send_queue_note', { p_officer_id: myProfile.officer_id, p_entry_id: visitorNoteEntryId, p_message: msg });
+    await renderVisitorNoteThread();
+  };
 
   function fmtDate(d){
     return new Date(d + 'T00:00:00').toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short', year:'numeric'});
@@ -313,6 +501,7 @@
 
   window.openReschedule = function(id){
     rescheduleTargetId = id;
+    rescheduleQueueEntryId = null;
     document.getElementById('rNewDate').value = '';
     document.getElementById('rNewTime').value = '';
     document.getElementById('rNote').value = '';
@@ -333,6 +522,10 @@
         ? '<div class="error">That officer already has an appointment at that time.</div>'
         : '<div class="error">Something went wrong. Please try again.</div>';
       return;
+    }
+    if(rescheduleQueueEntryId){
+      await supabase.rpc('queue_cancel', { p_entry_id: rescheduleQueueEntryId, p_reason: 'Rescheduled to a new time — see appointment.' });
+      rescheduleQueueEntryId = null;
     }
     closeModal('rescheduleModal');
     await notifyStatus(rescheduleTargetId, 'rescheduled');
