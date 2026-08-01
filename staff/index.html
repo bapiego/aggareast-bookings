@@ -450,14 +450,19 @@
     }).join('');
   }
 
+  async function notifyStatus(id, kind){
+    try { await supabase.functions.invoke('send-status-sms', { body: { appointment_id: id, kind } }); }
+    catch(e){ /* notification failure shouldn't block the action */ }
+  }
+
   window.doConfirm = async function(id){
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'confirmed', p_note: null });
-    if(!error){ await renderAppointments(); await renderLog(); }
+    if(!error){ await notifyStatus(id, 'confirmed'); await renderAppointments(); await renderLog(); }
   };
   window.doCancel = async function(id){
     if(!confirm('Cancel this appointment?')) return;
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'cancelled', p_note: null });
-    if(!error){ await renderAppointments(); await renderLog(); }
+    if(!error){ await notifyStatus(id, 'cancelled'); await renderAppointments(); await renderLog(); }
   };
   window.doComplete = async function(id){
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'completed', p_note: null });
@@ -488,6 +493,7 @@
       return;
     }
     closeModal('rescheduleModal');
+    await notifyStatus(rescheduleTargetId, 'rescheduled');
     await renderAppointments();
     await renderLog();
   };
@@ -515,7 +521,7 @@
       errEl.innerHTML = '<div class="error">Please fill in all required fields.</div>';
       return;
     }
-    const { error } = await supabase.rpc('create_appointment_staff', {
+    const { data: newId, error } = await supabase.rpc('create_appointment_staff', {
       p_officer_id: officerId, p_requester_name: name, p_requester_phone: phone,
       p_requester_church: church, p_purpose: purpose, p_date: date, p_time: time + ':00'
     });
@@ -526,6 +532,7 @@
       return;
     }
     closeModal('newApptModal');
+    if(newId) await notifyStatus(newId, 'confirmed');
     await renderAppointments();
     await renderLog();
   };
