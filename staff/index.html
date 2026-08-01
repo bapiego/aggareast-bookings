@@ -37,6 +37,7 @@
   button.danger{ background:#FDECEC; color:#9B2C2C; border:none; padding:9px 14px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; }
   button.gold{ background:var(--gold); color:var(--navy); border:none; padding:9px 16px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; }
   .error{ background:#FDECEC; color:#9B2C2C; border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
+  .info{ background:var(--lavender-light); color:var(--navy); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
 
   #topbar{ display:none; justify-content:space-between; align-items:center; margin-top:18px; color:var(--white); flex-wrap:wrap; gap:10px; }
   #topbar .who{ font-family:"Cambria",serif; font-weight:700; font-size:17px; }
@@ -143,6 +144,12 @@
     <div id="pinsView" style="display:none">
       <div class="section-title">Staff logins</div>
       <div id="pinsList"></div>
+      <div class="section-title">Daily digest (testing)</div>
+      <div class="appt">
+        <div class="meta">Manually send the "pending requests" digest right now, to whoever has a phone number on file. Use this to test before turning on the automatic daily schedule.</div>
+        <div class="btns"><button class="gold" onclick="sendDigestNow()">Send Digest Now</button></div>
+        <div id="digestResult" style="margin-top:10px"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -567,6 +574,18 @@
     if(error){ errEl.innerHTML = '<div class="error">Could not update PIN. Please try again.</div>'; return; }
     closeModal('pinModal');
     alert('PIN updated.');
+  };
+
+  window.sendDigestNow = async function(){
+    const el = document.getElementById('digestResult');
+    el.innerHTML = '<div class="empty-note">Sending…</div>';
+    const { data, error } = await supabase.functions.invoke('daily-digest-sms', { body: {} });
+    if(error){
+      el.innerHTML = '<div class="error">Something went wrong. Please try again.</div>';
+      return;
+    }
+    const lines = Object.entries(data.results || {}).map(([name, status]) => `${name}: ${status}`).join('<br>');
+    el.innerHTML = `<div class="info">Total pending: ${data.total_pending}.<br>${lines || 'Nothing to send.'}</div>`;
   };
 
   window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
