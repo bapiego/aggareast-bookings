@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manage Your Appointment — AG GAER</title>
+<style>
+  :root{
+    --navy:#2F3080; --navy-dark:#232566; --gold:#EEDF10;
+    --lavender:#B4B8DA; --lavender-light:#E7E8F3; --white:#FFFFFF; --ink:#1A1A1A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; font-family:"Calibri","Segoe UI",system-ui,sans-serif; color:var(--ink);
+    background:linear-gradient(180deg,var(--navy) 0%, var(--navy) 130px, var(--lavender-light) 130px, var(--lavender-light) 100%);
+    padding:0 16px 60px;
+  }
+  h1,h2,h3{ font-family:"Cambria","Georgia",serif; margin:0; }
+  .wrap{ max-width:520px; margin:0 auto; }
+
+  header.brand{ text-align:center; padding:26px 0 14px; color:var(--white); }
+  header.brand .region{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:700; }
+  header.brand h1{ font-size:20px; font-weight:700; margin-top:2px; }
+
+  .card{ background:var(--white); border-radius:var(--radius); margin-top:16px; padding:22px; box-shadow:0 6px 20px rgba(35,37,102,0.1); }
+  .card h2{ font-size:18px; color:var(--navy); margin-bottom:4px; }
+  .sub{ font-size:13.5px; color:#555; margin-bottom:14px; }
+
+  label{ display:block; font-size:13px; font-weight:700; color:var(--navy); margin:12px 0 5px; }
+  input,textarea{ width:100%; padding:11px 12px; font-size:15px; border:1.5px solid var(--lavender); border-radius:8px; font-family:inherit; }
+  input:focus,textarea:focus{ outline:none; border-color:var(--navy); }
+
+  button.primary{ background:var(--navy); color:var(--white); border:none; padding:13px; border-radius:8px; font-weight:700; font-size:15px; cursor:pointer; width:100%; margin-top:16px; }
+  button.primary:hover{ background:var(--navy-dark); }
+  button.primary:disabled{ background:#ccc; cursor:not-allowed; }
+  button.secondary{ background:var(--lavender-light); color:var(--navy); border:none; padding:11px 14px; border-radius:8px; font-weight:700; font-size:13.5px; cursor:pointer; flex:1; }
+  button.danger{ background:#FDECEC; color:#9B2C2C; border:none; padding:11px 14px; border-radius:8px; font-weight:700; font-size:13.5px; cursor:pointer; flex:1; }
+  .btn-row{ display:flex; gap:10px; margin-top:16px; }
+  .error{ background:#FDECEC; color:#9B2C2C; border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
+  .info{ background:var(--lavender-light); color:var(--navy); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
+
+  .badge{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; display:inline-block; }
+  .badge.pending{ background:#FFF3CD; color:#8A6D00; }
+  .badge.confirmed{ background:#DDF3E4; color:#1F7A3F; }
+  .badge.cancelled{ background:#FDECEC; color:#9B2C2C; }
+  .badge.completed{ background:var(--lavender-light); color:var(--navy); }
+
+  .appt-when{ font-family:"Cambria",serif; font-weight:700; color:var(--navy); font-size:19px; margin-top:10px; }
+  .appt-officer{ font-size:14.5px; color:#444; margin-top:2px; }
+  .appt-purpose{ font-size:13.5px; margin-top:12px; line-height:1.5; color:#444; }
+
+  .date-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin:14px 0; }
+  .chip{ flex:0 0 auto; background:var(--lavender-light); border:2px solid transparent; border-radius:20px; padding:8px 14px; font-size:13px; font-weight:700; color:var(--navy); cursor:pointer; white-space:nowrap; }
+  .chip.selected{ border-color:var(--gold); background:var(--navy); color:var(--white); }
+  .slot-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .slot{ background:var(--lavender-light); border:2px solid transparent; border-radius:8px; padding:10px 4px; font-size:13px; font-weight:700; color:var(--navy); cursor:pointer; text-align:center; }
+  .slot.selected{ border-color:var(--gold); background:var(--navy); color:var(--white); }
+  .slot:disabled{ opacity:.35; text-decoration:line-through; cursor:not-allowed; }
+  .empty-note{ font-size:13.5px; color:#666; padding:10px 0; text-align:center; }
+
+  footer{ text-align:center; margin-top:22px; font-size:11.5px; color:var(--navy); opacity:.55; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div class="region">Greater Accra East Region</div>
+    <h1>Manage Your Appointment</h1>
+  </header>
+
+  <div class="card" id="lookupCard">
+    <h2>Find your appointment</h2>
+    <div class="sub">Enter the reference from your text message and the phone number you booked with.</div>
+    <label for="refInput">Reference</label>
+    <input id="refInput" type="text" placeholder="e.g. 8B0D1ACA" />
+    <label for="phoneInput">Phone number</label>
+    <input id="phoneInput" type="tel" placeholder="e.g. 024 123 4567" />
+    <div id="lookupError"></div>
+    <button class="primary" onclick="lookup()">View Appointment</button>
+  </div>
+
+  <div class="card" id="apptCard" style="display:none">
+    <div class="badge" id="apptBadge"></div>
+    <div class="appt-when" id="apptWhen"></div>
+    <div class="appt-officer" id="apptOfficer"></div>
+    <div class="appt-purpose" id="apptPurpose"></div>
+    <div id="apptMsg"></div>
+    <div class="btn-row" id="apptBtns"></div>
+  </div>
+
+  <div class="card" id="rescheduleCard" style="display:none">
+    <h2>Choose a new time</h2>
+    <div class="sub" id="rescheduleSub"></div>
+    <div class="date-row" id="dateRow"></div>
+    <div class="slot-grid" id="slotGrid"></div>
+    <div id="rescheduleError"></div>
+    <button class="secondary" style="width:100%; margin-top:14px" onclick="cancelReschedule()">Back</button>
+  </div>
+
+  <footer>Assemblies of God, Ghana — Greater Accra East Region</footer>
+</div>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const SUPABASE_URL = 'https://fdcpvocferfjfvwbzhhe.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkY3B2b2NmZXJmamZ2d2J6aGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDk0NTgsImV4cCI6MjEwMTA4NTQ1OH0.j_6nhUKOjwesGGHMubgHvHzOg4184pTQ9e9Djnz-KwE';
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let current = null; // last-looked-up appointment
+  let lastPhone = '';
+  let selectedNewDate = null;
+
+  function fmtDate(d){ return new Date(d + 'T00:00:00').toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short', year:'numeric'}); }
+  function fmtTime(t){
+    const [h,m] = t.split(':').map(Number);
+    const ampm = h>=12 ? 'PM':'AM';
+    const h12 = ((h+11)%12)+1;
+    return `${h12}:${m.toString().padStart(2,'0')} ${ampm}`;
+  }
+  function dateStr(d){ return d.toISOString().slice(0,10); }
+
+  window.lookup = async function(){
+    const ref = document.getElementById('refInput').value.trim();
+    const phone = document.getElementById('phoneInput').value.trim();
+    const errEl = document.getElementById('lookupError');
+    errEl.innerHTML = '';
+    if(!ref || !phone){ errEl.innerHTML = '<div class="error">Please enter both your reference and phone number.</div>'; return; }
+
+    const { data, error } = await supabase.rpc('get_appointment_for_requester', { p_ref: ref, p_phone: phone });
+    if(error || !data || !data.length){
+      errEl.innerHTML = '<div class="error">We couldn\'t find an appointment with those details. Please check and try again.</div>';
+      return;
+    }
+    current = data[0];
+    lastPhone = phone;
+    renderAppt();
+  };
+
+  function renderAppt(){
+    document.getElementById('lookupCard').style.display = 'none';
+    document.getElementById('rescheduleCard').style.display = 'none';
+    const card = document.getElementById('apptCard');
+    card.style.display = 'block';
+
+    document.getElementById('apptBadge').textContent = current.status;
+    document.getElementById('apptBadge').className = 'badge ' + current.status;
+    document.getElementById('apptWhen').textContent = fmtDate(current.requested_date) + ' · ' + fmtTime(current.requested_time.slice(0,5));
+    document.getElementById('apptOfficer').textContent = 'With ' + current.officer_name + ' — ' + current.officer_title;
+    document.getElementById('apptPurpose').textContent = current.purpose || '';
+
+    const msgEl = document.getElementById('apptMsg');
+    const btnsEl = document.getElementById('apptBtns');
+    msgEl.innerHTML = ''; btnsEl.innerHTML = '';
+
+    if(current.status === 'cancelled'){
+      msgEl.innerHTML = '<div class="info">This appointment has been cancelled.</div>';
+    } else if(current.status === 'completed'){
+      msgEl.innerHTML = '<div class="info">This appointment has already taken place.</div>';
+    } else {
+      btnsEl.innerHTML = `
+        <button class="secondary" onclick="openReschedule()">Request a different time</button>
+        <button class="danger" onclick="doCancel()">Cancel</button>`;
+    }
+  }
+
+  window.doCancel = async function(){
+    if(!confirm('Cancel this appointment?')) return;
+    const { error } = await supabase.rpc('requester_cancel', { p_ref: current.id, p_phone: lastPhone });
+    if(error){ alert('Something went wrong. Please try again.'); return; }
+    current.status = 'cancelled';
+    renderAppt();
+  };
+
+  window.openReschedule = async function(){
+    document.getElementById('apptCard').style.display = 'none';
+    document.getElementById('rescheduleCard').style.display = 'block';
+    document.getElementById('rescheduleSub').textContent = `With ${current.officer_name} — office hours only.`;
+    document.getElementById('rescheduleError').innerHTML = '';
+
+    const { data: hours } = await supabase.from('office_hours').select('*').eq('officer_id', current.officer_id);
+    const validWeekdays = (hours||[]).map(h=>h.weekday);
+    const dates = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    for(let i=0;i<28 && dates.length<8;i++){
+      const d = new Date(today); d.setDate(today.getDate()+i);
+      if(validWeekdays.includes(d.getDay())) dates.push(d);
+    }
+    const row = document.getElementById('dateRow');
+    row.innerHTML = '';
+    dates.forEach((d,idx)=>{
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = d.toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short'});
+      chip.onclick = () => selectDate(d, chip, hours);
+      row.appendChild(chip);
+      if(idx===0) selectDate(d, chip, hours);
+    });
+  };
+
+  window.cancelReschedule = function(){
+    document.getElementById('rescheduleCard').style.display = 'none';
+    renderAppt();
+  };
+
+  async function selectDate(d, chipEl, hours){
+    selectedNewDate = d;
+    document.querySelectorAll('#dateRow .chip').forEach(c=>c.classList.remove('selected'));
+    chipEl.classList.add('selected');
+    await renderSlots(hours);
+  }
+
+  async function renderSlots(hours){
+    const grid = document.getElementById('slotGrid');
+    grid.innerHTML = '<div class="empty-note">Loading available times…</div>';
+
+    const oh = (hours||[]).find(h=>h.weekday===selectedNewDate.getDay());
+    if(!oh){ grid.innerHTML = '<div class="empty-note">No office hours on this day.</div>'; return; }
+
+    const ds = dateStr(selectedNewDate);
+    const { data: booked } = await supabase.rpc('public_taken_slots', {
+      p_officer_id: current.officer_id, p_date: ds, p_exclude_id: current.id
+    });
+    const bookedTimes = new Set((booked||[]).map(b=>b.requested_time.slice(0,5)));
+
+    const [sh,sm] = oh.start_time.split(':').map(Number);
+    const [eh,em] = oh.end_time.split(':').map(Number);
+    const startMin = sh*60+sm, endMin = eh*60+em;
+    const now = new Date();
+    const isToday = dateStr(now) === ds;
+    const nowMin = now.getHours()*60 + now.getMinutes();
+
+    grid.innerHTML = '';
+    let any = false;
+    for(let m=startMin; m<endMin; m+=oh.slot_minutes){
+      const hh = String(Math.floor(m/60)).padStart(2,'0');
+      const mm = String(m%60).padStart(2,'0');
+      const timeKey = `${hh}:${mm}`;
+      const taken = bookedTimes.has(timeKey);
+      const past = isToday && m<=nowMin;
+      const btn = document.createElement('button');
+      btn.className = 'slot';
+      btn.textContent = fmtTime(timeKey);
+      btn.disabled = taken || past;
+      if(!btn.disabled){
+        any = true;
+        btn.onclick = () => confirmNewSlot(timeKey);
+      }
+      grid.appendChild(btn);
+    }
+    if(!any) grid.innerHTML = '<div class="empty-note">No open slots on this day — please pick another date.</div>';
+  }
+
+  async function confirmNewSlot(timeKey){
+    const errEl = document.getElementById('rescheduleError');
+    errEl.innerHTML = '';
+    const { error } = await supabase.rpc('requester_reschedule', {
+      p_ref: current.id, p_phone: lastPhone,
+      p_new_date: dateStr(selectedNewDate), p_new_time: timeKey + ':00'
+    });
+    if(error){
+      errEl.innerHTML = error.code === '23505'
+        ? '<div class="error">That time was just taken. Please choose another.</div>'
+        : '<div class="error">Something went wrong. Please try again.</div>';
+      return;
+    }
+    current.requested_date = dateStr(selectedNewDate);
+    current.requested_time = timeKey + ':00';
+    current.status = 'pending';
+    document.getElementById('rescheduleCard').style.display = 'none';
+    renderAppt();
+    document.getElementById('apptMsg').innerHTML = '<div class="info">New time requested. The office will confirm by phone.</div>';
+  }
+
+  // Pre-fill from ?ref= link
+  const params = new URLSearchParams(window.location.search);
+  const refParam = params.get('ref');
+  if(refParam) document.getElementById('refInput').value = refParam;
+</script>
+</body>
+</html>
