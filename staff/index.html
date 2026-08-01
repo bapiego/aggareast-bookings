@@ -122,6 +122,7 @@
     <div class="tabs">
       <button class="tab active" id="tabAppts" onclick="switchTab('appts')">Appointments</button>
       <button class="tab" id="tabLog" onclick="switchTab('log')">Audit Log</button>
+      <button class="tab" id="tabPins" onclick="switchTab('pins')" style="display:none">Staff PINs</button>
     </div>
 
     <div id="apptsView">
@@ -137,6 +138,11 @@
     <div id="logView" style="display:none">
       <div class="chip-row" id="logOfficerChips"></div>
       <div id="logList" style="margin-top:16px"></div>
+    </div>
+
+    <div id="pinsView" style="display:none">
+      <div class="section-title">Staff logins</div>
+      <div id="pinsList"></div>
     </div>
   </div>
 </div>
@@ -181,6 +187,22 @@
     <div class="btn-row">
       <button class="secondary" onclick="closeModal('rescheduleModal')">Cancel</button>
       <button class="primary" style="margin-top:0" onclick="confirmReschedule()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin: Reset Someone Else's PIN Modal -->
+<div class="modal-bg" id="resetPinModal">
+  <div class="modal">
+    <h3>Reset PIN — <span id="resetPinName"></span></h3>
+    <label>New PIN (at least 6 digits)</label>
+    <input type="password" inputmode="numeric" id="resetPin1" />
+    <label>Confirm new PIN</label>
+    <input type="password" inputmode="numeric" id="resetPin2" />
+    <div id="resetPinError"></div>
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('resetPinModal')">Cancel</button>
+      <button class="primary" style="margin-top:0" onclick="confirmResetPin()">Reset PIN</button>
     </div>
   </div>
 </div>
@@ -273,6 +295,11 @@
     document.getElementById('whoName').textContent = profile.display_name;
     document.getElementById('whoTitle').textContent = profile.role === 'admin' ? 'Head of Operations' : 'Receptionist';
 
+    if(profile.role === 'admin'){
+      document.getElementById('tabPins').style.display = 'inline-block';
+      await renderPins();
+    }
+
     renderOfficerChips('officerChips', apptFilterOfficerId, selectApptOfficer);
     renderOfficerChips('logOfficerChips', logFilterOfficerId, selectLogOfficer);
 
@@ -294,8 +321,54 @@
   window.switchTab = function(tab){
     document.getElementById('tabAppts').classList.toggle('active', tab==='appts');
     document.getElementById('tabLog').classList.toggle('active', tab==='log');
+    document.getElementById('tabPins').classList.toggle('active', tab==='pins');
     document.getElementById('apptsView').style.display = tab==='appts' ? 'block' : 'none';
     document.getElementById('logView').style.display = tab==='log' ? 'block' : 'none';
+    document.getElementById('pinsView').style.display = tab==='pins' ? 'block' : 'none';
+  };
+
+  let resetPinTarget = null;
+
+  async function renderPins(){
+    const { data: profiles } = await supabase.from('profiles').select('*').order('role').order('display_name');
+    const el = document.getElementById('pinsList');
+    if(!profiles || !profiles.length){ el.innerHTML = '<div class="empty-note">No staff logins found.</div>'; return; }
+    el.innerHTML = profiles.map(p => {
+      const roleLabel = p.role === 'admin' ? 'Head of Operations' : (p.role === 'receptionist' ? 'Receptionist' : officerName(p.officer_id));
+      return `<div class="appt">
+        <div class="who">${p.display_name}</div>
+        <div class="meta">${roleLabel}</div>
+        <div class="btns">
+          <button class="secondary" onclick="openResetPin('${p.id}','${p.display_name.replace(/'/g,"\\'")}')">Reset PIN</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  window.openResetPin = function(userId, name){
+    resetPinTarget = userId;
+    document.getElementById('resetPinName').textContent = name;
+    document.getElementById('resetPin1').value = '';
+    document.getElementById('resetPin2').value = '';
+    document.getElementById('resetPinError').innerHTML = '';
+    document.getElementById('resetPinModal').classList.add('show');
+  };
+  window.confirmResetPin = async function(){
+    const p1 = document.getElementById('resetPin1').value;
+    const p2 = document.getElementById('resetPin2').value;
+    const errEl = document.getElementById('resetPinError');
+    if(p1.length < 6){ errEl.innerHTML = '<div class="error">PIN must be at least 6 digits.</div>'; return; }
+    if(p1 !== p2){ errEl.innerHTML = '<div class="error">PINs do not match.</div>'; return; }
+
+    const { data, error } = await supabase.functions.invoke('admin-reset-pin', {
+      body: { staff_user_id: resetPinTarget, new_pin: p1 }
+    });
+    if(error || (data && data.error)){
+      errEl.innerHTML = `<div class="error">${(data && data.error) || 'Could not reset PIN. Please try again.'}</div>`;
+      return;
+    }
+    closeModal('resetPinModal');
+    alert('PIN reset successfully. Share the new PIN with them directly.');
   };
 
   function fmtDate(d){
