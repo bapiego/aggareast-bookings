@@ -18,6 +18,30 @@
   }
   h1,h2,h3{ font-family:"Cambria","Georgia",serif; margin:0; }
   .wrap{ max-width:720px; margin:0 auto; }
+  #loginCard{ max-width:420px; margin:16px auto 0; }
+
+  .queue-columns{ display:block; }
+  .queue-col-scroll{ max-height:none; }
+
+  /* Desktop: receptionist watches this screen continuously at a desk, so
+     give her all three queue states side by side instead of stacked —
+     no scrolling to see the whole picture at once. */
+  @media (min-width: 900px){
+    .wrap{ max-width:1160px; }
+    .queue-columns{ display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; align-items:start; }
+    .queue-col .section-title{ margin-top:22px; }
+    .queue-col-scroll{ max-height:62vh; overflow-y:auto; padding-right:4px; }
+    #frontDeskView .note-input-row{ max-width:640px; }
+    #frontDeskView #fdNotesThread{ max-width:640px; }
+
+    #pendingList, #upcomingList, #pastList, #logList, #pinsList{
+      column-count:2; column-gap:16px;
+    }
+    #pendingList .appt, #upcomingList .appt, #pastList .appt,
+    #logList .log-row, #pinsList .appt{
+      break-inside:avoid;
+    }
+  }
 
   header.brand{ text-align:center; padding:26px 0 14px; color:var(--white); }
   header.brand .region{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:700; }
@@ -169,12 +193,20 @@
 
     <div id="frontDeskView">
       <div class="chip-row" id="fdOfficerChips"></div>
-      <div class="section-title">Being seen now</div>
-      <div id="fdCalled"></div>
-      <div class="section-title">Held — not ready</div>
-      <div id="fdHeld"></div>
-      <div class="section-title">Waiting</div>
-      <div id="fdWaiting"></div>
+      <div class="queue-columns">
+        <div class="queue-col">
+          <div class="section-title">Being seen now</div>
+          <div id="fdCalled" class="queue-col-scroll"></div>
+        </div>
+        <div class="queue-col">
+          <div class="section-title">Held — not ready</div>
+          <div id="fdHeld" class="queue-col-scroll"></div>
+        </div>
+        <div class="queue-col">
+          <div class="section-title">Waiting</div>
+          <div id="fdWaiting" class="queue-col-scroll"></div>
+        </div>
+      </div>
       <div class="section-title">Notes with officer</div>
       <div id="fdNotesThread" class="note-thread"></div>
       <div class="note-input-row">
@@ -973,6 +1005,18 @@
   };
 
   window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
+
+  // ---------- Desktop keyboard workflow: Enter submits instead of forcing clicks ----------
+  document.getElementById('pinInput').addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
+  document.getElementById('ciPhone').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); lookupBooking(); } });
+  document.getElementById('fdNoteInput').addEventListener('keydown', e => { if(e.key === 'Enter') sendGeneralNote(); });
+  document.getElementById('vnInput').addEventListener('keydown', e => { if(e.key === 'Enter') sendVisitorNote(); });
+
+  const _openCheckIn = window.openCheckIn;
+  window.openCheckIn = function(){
+    _openCheckIn();
+    setTimeout(() => document.getElementById('ciPhone').focus(), 50);
+  };
 
   async function init(){
     await loadOfficers();
