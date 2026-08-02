@@ -308,3 +308,127 @@ footer{ letter-spacing:.04em; }
     transition-duration:.01ms !important;
   }
 }
+
+/* ---------- Staff dashboard: calmer hierarchy ----------
+   Scoped to the staff page only via <body class="staff-page">.
+   Quieter secondary actions + softer bold text so the primary
+   action and each card's focal point stand out.
+   Delete this block (or git revert) to restore. */
+
+.staff-page button{ font-weight:600; }
+.staff-page button.primary{ font-weight:700; }
+
+/* Topbar: solid gold = primary action, outline gold = secondary,
+   PIN / log-out become quiet ghost buttons on navy. */
+.staff-page #topbar .actions{ gap:6px; }
+.staff-page #topbar .actions button{
+  padding:7px 12px;
+  border-radius:999px;
+  box-shadow:none;
+  transform:none;
+}
+.staff-page #topbar .actions button.gold:first-child{
+  background:linear-gradient(180deg,#FFF7B0 0%,var(--gold) 100%);
+  color:var(--navy);
+  border:1px solid rgba(238,223,16,.8);
+  box-shadow:0 2px 8px rgba(238,223,16,.28);
+}
+.staff-page #topbar .actions button.gold:not(:first-child){
+  background:rgba(238,223,16,.14);
+  color:var(--gold);
+  border:1px solid rgba(238,223,16,.4);
+  box-shadow:none;
+}
+.staff-page #topbar .actions button.gold:hover{ filter:brightness(1.04); transform:none; }
+.staff-page #topbar .actions button.secondary,
+.staff-page #topbar .actions button.danger{
+  background:transparent;
+  color:var(--white);
+  border:1px solid rgba(255,255,255,.3);
+  opacity:.85;
+}
+.staff-page #topbar .actions button.secondary:hover,
+.staff-page #topbar .actions button.danger:hover{
+  background:rgba(255,255,255,.12);
+  opacity:1;
+  filter:none;
+  box-shadow:none;
+  transform:none;
+}
+.staff-page #topbar .who{ font-weight:600; }
+
+/* Tabs: quieter so only the active pill carries weight. */
+.staff-page .tab{ font-weight:600; padding:8px 16px; }
+
+/* Officer filter chips: flat and calm unless active. */
+.staff-page .officer-chip{
+  font-weight:600;
+  border-width:1px;
+  padding:6px 13px;
+  box-shadow:none;
+}
+.staff-page .officer-chip:hover{ transform:none; box-shadow:none; }
+.staff-page .officer-chip.active{
+  font-weight:700;
+  box-shadow:0 0 0 2px var(--gold);
+}
+
+/* Cards: flat, one focal point per card. */
+.staff-page .appt{
+  box-shadow:none;
+  padding:14px 16px;
+  margin-bottom:10px;
+}
+.staff-page .appt:hover{ box-shadow:var(--shadow-sm); }
+.staff-page .appt .when{ font-weight:700; }
+.staff-page .appt .officer-name{ font-weight:600; }
+.staff-page .appt .who{ font-weight:600; }
+
+/* Card actions: quiet outlines; filled on hover. */
+.staff-page .appt .btns button{
+  background:transparent;
+  border:1px solid var(--hairline-strong);
+  color:var(--navy);
+  padding:5px 11px;
+  font-size:12px;
+  font-weight:600;
+  box-shadow:none;
+}
+.staff-page .appt .btns button.danger{
+  border-color:rgba(155,44,44,.3);
+  color:#9B2C2C;
+}
+.staff-page .appt .btns button:hover{
+  background:var(--lavender-light);
+  filter:none;
+  transform:none;
+}
+.staff-page .appt .btns button.danger:hover{ background:#FDECEC; }
+
+/* Section headings: keep the gold tick, drop the shout. */
+.staff-page .section-title{ font-weight:600; }
+.staff-page .badge{ font-weight:600; }
+
+/* Notes: softer sender labels, quiet send button. */
+.staff-page .note-line b{ font-weight:600; }
+.staff-page .note-input-row button{
+  background:transparent;
+  border:1px solid var(--hairline-strong);
+  color:var(--navy);
+  box-shadow:none;
+}
+
+/* Audit log rows. */
+.staff-page .log-row .top{ font-weight:600; }
+
+/* Modals: Cancel is a quiet outline, the confirm action stays primary. */
+.staff-page .modal button.secondary{
+  background:transparent;
+  border:1px solid var(--hairline-strong);
+  color:var(--navy);
+  box-shadow:none;
+}
+.staff-page .modal button.secondary:hover{
+  background:var(--lavender-light);
+  filter:none;
+}
