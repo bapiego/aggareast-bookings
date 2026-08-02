@@ -152,6 +152,13 @@
       <button class="tab" id="tabQueue" onclick="switchTab('queue')">Queue<span id="queueBadgeCount"></span></button>
     </div>
 
+    <div class="section-title">Conversation with front desk</div>
+    <div id="qNotesThread" class="note-thread"></div>
+    <div class="note-input-row">
+      <input id="qNoteInput" type="text" placeholder="Send a quick note…" />
+      <button class="secondary" onclick="sendGeneralNote()">Send</button>
+    </div>
+
     <div id="apptsView">
       <div class="section-title">Needs your action</div>
       <div id="pendingList"></div>
@@ -170,12 +177,6 @@
       <div id="qCalled"></div>
       <div class="section-title">Held by front desk</div>
       <div id="qHeld"></div>
-      <div class="section-title">Notes with front desk</div>
-      <div id="qNotesThread" class="note-thread"></div>
-      <div class="note-input-row">
-        <input id="qNoteInput" type="text" placeholder="Send a quick note…" />
-        <button class="secondary" onclick="sendGeneralNote()">Send</button>
-      </div>
     </div>
   </div>
 </div>
@@ -309,6 +310,7 @@
     await renderAppointments();
     await renderQueue();
     subscribeRealtime();
+    startNotesPolling();
   }
 
   window.switchTab = function(tab){
@@ -473,12 +475,22 @@
 
   // ---------- Notes ----------
   async function renderNotesThread(){
-    const { data } = await supabase.from('queue_notes').select('*')
+    const el = document.getElementById('qNotesThread');
+    if(!el) return;
+    const { data, error } = await supabase.from('queue_notes').select('*')
       .eq('officer_id', myProfile.officer_id).is('queue_entry_id', null)
       .order('created_at', { ascending: true }).limit(50);
-    const el = document.getElementById('qNotesThread');
+    if(error){
+      el.innerHTML = '<div class="error">Could not load the conversation — <button class="secondary" onclick="renderNotesThread()">Retry</button></div>';
+      return;
+    }
     el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
     el.scrollTop = el.scrollHeight;
+  }
+  window.renderNotesThread = renderNotesThread;
+
+  function startNotesPolling(){
+    setInterval(renderNotesThread, 10000);
   }
   window.sendGeneralNote = async function(){
     const input = document.getElementById('qNoteInput');
@@ -497,10 +509,16 @@
     document.getElementById('visitorNoteModal').classList.add('show');
   };
   async function renderVisitorNoteThread(){
-    const { data } = await supabase.from('queue_notes').select('*')
+    const { data, error } = await supabase.from('queue_notes').select('*')
       .eq('queue_entry_id', visitorNoteEntryId).order('created_at', { ascending: true });
-    document.getElementById('vnThread').innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    const el = document.getElementById('vnThread');
+    if(error){
+      el.innerHTML = '<div class="error">Could not load notes — <button class="secondary" onclick="renderVisitorNoteThread()">Retry</button></div>';
+      return;
+    }
+    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
   }
+  window.renderVisitorNoteThread = renderVisitorNoteThread;
   window.sendVisitorNote = async function(){
     const input = document.getElementById('vnInput');
     const msg = input.value.trim();

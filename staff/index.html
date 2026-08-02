@@ -475,6 +475,7 @@
     await renderLog();
     await renderFrontDesk();
     subscribeRealtime();
+    startNotesPolling();
   }
 
   function selectApptOfficer(id){
@@ -715,11 +716,20 @@
   async function renderNotesThread(){
     const el = document.getElementById('fdNotesThread');
     if(fdOfficerId === 'all'){ el.innerHTML = '<div class="empty-note">Select an officer above to view notes.</div>'; return; }
-    const { data } = await supabase.from('queue_notes').select('*')
+    const { data, error } = await supabase.from('queue_notes').select('*')
       .eq('officer_id', fdOfficerId).is('queue_entry_id', null)
       .order('created_at', { ascending: true }).limit(50);
+    if(error){
+      el.innerHTML = '<div class="error">Could not load notes — <button class="secondary" onclick="renderNotesThread()">Retry</button></div>';
+      return;
+    }
     el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
     el.scrollTop = el.scrollHeight;
+  }
+  window.renderNotesThread = renderNotesThread;
+
+  function startNotesPolling(){
+    setInterval(renderNotesThread, 10000);
   }
   window.sendGeneralNote = async function(){
     if(fdOfficerId === 'all'){ alert('Select an officer first.'); return; }
@@ -739,10 +749,16 @@
     document.getElementById('visitorNoteModal').classList.add('show');
   };
   async function renderVisitorNoteThread(){
-    const { data } = await supabase.from('queue_notes').select('*')
+    const { data, error } = await supabase.from('queue_notes').select('*')
       .eq('queue_entry_id', visitorNoteEntryId).order('created_at', { ascending: true });
-    document.getElementById('vnThread').innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    const el = document.getElementById('vnThread');
+    if(error){
+      el.innerHTML = '<div class="error">Could not load notes — <button class="secondary" onclick="renderVisitorNoteThread()">Retry</button></div>';
+      return;
+    }
+    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
   }
+  window.renderVisitorNoteThread = renderVisitorNoteThread;
   window.sendVisitorNote = async function(){
     const input = document.getElementById('vnInput');
     const msg = input.value.trim();
