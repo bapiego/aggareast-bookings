@@ -1,0 +1,6 @@
+# Supabase CLI temp/metadata (machine-specific)
+supabase/.temp/
+
+# OS junk
+Thumbs.db
+.DS_Store
