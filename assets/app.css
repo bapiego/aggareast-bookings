@@ -462,41 +462,26 @@ footer{ letter-spacing: .04em; }
 
 /* Topbar: solid gold = primary action, outline gold = secondary,
    PIN / log-out become quiet ghost buttons on navy. */
-.staff-page #topbar .actions{ gap:6px; }
-.staff-page #topbar .actions button{
+.staff-page #topbar .primary-actions{ gap:8px; display:flex; align-items:center; }
+.staff-page #topbar .primary-actions button{
   padding:7px 12px;
   border-radius:999px;
   box-shadow:none;
   transform:none;
 }
-.staff-page #topbar .actions button.gold:first-child{
+.staff-page #topbar .primary-actions button.gold:first-child{
   background:linear-gradient(180deg,#FFF7B0 0%,var(--gold) 100%);
   color:var(--navy);
   border:1px solid rgba(238,223,16,.8);
   box-shadow:0 2px 8px rgba(238,223,16,.28);
 }
-.staff-page #topbar .actions button.gold:not(:first-child){
+.staff-page #topbar .primary-actions button.gold:not(:first-child){
   background:rgba(238,223,16,.14);
   color:var(--gold);
   border:1px solid rgba(238,223,16,.4);
   box-shadow:none;
 }
-.staff-page #topbar .actions button.gold:hover{ filter:brightness(1.04); transform:none; }
-.staff-page #topbar .actions button.secondary,
-.staff-page #topbar .actions button.danger{
-  background:transparent;
-  color:var(--white);
-  border:1px solid rgba(255,255,255,.3);
-  opacity:.85;
-}
-.staff-page #topbar .actions button.secondary:hover,
-.staff-page #topbar .actions button.danger:hover{
-  background:rgba(255,255,255,.12);
-  opacity:1;
-  filter:none;
-  box-shadow:none;
-  transform:none;
-}
+.staff-page #topbar .primary-actions button.gold:hover{ filter:brightness(1.04); transform:none; }
 .staff-page #topbar .who{ font-weight:600; }
 
 /* Tabs: quieter so only the active pill carries weight. */
@@ -960,3 +945,46 @@ button.gold .btn-spinner{ border-color:rgba(47,48,128,.2); border-top-color:var(
 .note-line{ display:flex; gap:8px; align-items:flex-start; }
 .note-line .avatar{ flex-shrink:0; margin-top:2px; }
 .note-line .note-content{ flex:1; min-width:0; }
+
+/* ============================================================
+   USER MENU DROPDOWN — Replaces inline Change PIN / Log Out
+   ============================================================ */
+.user-menu{ position:relative; }
+.user-menu-btn{
+  display:flex; align-items:center; gap:8px;
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);
+  border-radius:10px; padding:6px 12px 6px 6px; cursor:pointer;
+  color:var(--white); font-size:13px; font-weight:600;
+  transition:background .2s, transform .15s;
+}
+.user-menu-btn:hover{ background:rgba(255,255,255,.2); }
+.user-menu-btn:active{ transform:scale(.97); }
+.user-menu-btn .avatar{ flex-shrink:0; }
+.user-menu-btn .lucide{ width:16px; height:16px; opacity:.7; }
+.user-menu-dd{
+  display:none; position:absolute; top:calc(100% + 6px); right:0;
+  background:rgba(255,255,255,.95); backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(180,184,218,.25); border-radius:12px;
+  box-shadow:0 12px 40px rgba(31,38,135,.18);
+  min-width:180px; padding:6px; z-index:50;
+  animation:ddIn .2s cubic-bezier(.175,.885,.32,1.275);
+}
+.user-menu-dd.show{ display:block; }
+@keyframes ddIn{ from{opacity:0;transform:translateY(-6px) scale(.96);} to{opacity:1;transform:none;} }
+.user-menu-dd button{
+  display:flex; align-items:center; gap:8px; width:100%;
+  background:none; border:none; padding:10px 12px; border-radius:8px;
+  font-size:14px; font-weight:500; color:var(--navy); cursor:pointer;
+  transition:background .15s;
+}
+.user-menu-dd button:hover{ background:rgba(180,184,218,.15); }
+.user-menu-dd button.danger{ color:#e53e3e; }
+.user-menu-dd button.danger:hover{ background:rgba(229,62,62,.08); }
+.user-menu-dd .lucide{ width:16px; height:16px; }
+.user-menu-dd hr{ border:none; border-top:1px solid var(--lavender-light); margin:4px 0; }
+
+@media(max-width:640px){
+  .user-menu-btn span{ display:none; }
+  .user-menu-btn{ padding:6px; }
+}

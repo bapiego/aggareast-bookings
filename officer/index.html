@@ -42,7 +42,6 @@
   #topbar{ display:none; justify-content:space-between; align-items:center; margin-top:18px; color:var(--white); }
   #topbar .who{ font-family:"Cambria",serif; font-weight:700; font-size:17px; }
   #topbar .title{ font-size:12px; opacity:.85; }
-  #topbar .actions{ display:flex; gap:8px; }
 
   /* SECTION HEADERS */
   .section-title{ font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--navy); font-weight:700; margin:22px 4px 10px; }
@@ -106,7 +105,7 @@
   .empty-note{ text-align:center; color:#666; font-size:13.5px; padding:14px; }
 
   /* MODAL */
-  .modal-bg{ display:none; position:fixed; inset:0; background:rgba(26,26,26,.5); align-items:center; justify-content:center; padding:16px; z-index:10; }
+  .modal-bg{ display:none; position:fixed; inset:0; background:rgba(26,26,26,.5); align-items:center; justify-content:center; padding:16px; z-index:100; }
   .modal-bg.show{ display:flex; }
   .modal{ background:var(--white); border-radius:var(--radius); padding:22px; width:100%; max-width:400px; }
   .modal h3{ font-size:17px; color:var(--navy); margin-bottom:14px; }
@@ -132,9 +131,17 @@
       <div class="who" id="whoName"></div>
       <div class="title" id="whoTitle"></div>
     </div>
-    <div class="actions">
-      <button class="secondary" onclick="openPinModal()"><i data-lucide="lock"></i>Change PIN</button>
-      <button class="danger" onclick="logout()"><i data-lucide="log-out"></i>Log Out</button>
+    <div class="user-menu" id="userMenu">
+      <button class="user-menu-btn" onclick="toggleUserMenu()">
+        <span class="avatar sm c0" id="userAvatar">?</span>
+        <span id="userMenuName"></span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+      <div class="user-menu-dd" id="userMenuDD">
+        <button onclick="openPinModal()"><i data-lucide="lock"></i>Change PIN</button>
+        <hr>
+        <button class="danger" onclick="confirmLogout()"><i data-lucide="log-out"></i>Log Out</button>
+      </div>
     </div>
   </div>
 
@@ -154,13 +161,6 @@
       <button class="tab" id="tabQueue" onclick="switchTab('queue')"><i data-lucide="users"></i>Queue<span id="queueBadgeCount"></span></button>
     </div>
 
-    <div class="section-title">Conversation with front desk</div>
-    <div id="qNotesThread" class="note-thread"></div>
-    <div class="note-input-row">
-      <input id="qNoteInput" type="text" placeholder="Send a quick note…" />
-      <button class="secondary" onclick="sendGeneralNote()"><i data-lucide="send"></i>Send</button>
-    </div>
-
     <div id="apptsView">
       <div class="section-title">Needs your action</div>
       <div id="pendingList"></div>
@@ -173,6 +173,13 @@
     </div>
 
     <div id="queueView" style="display:none">
+      <div class="section-title">Conversation with front desk</div>
+      <div id="qNotesThread" class="note-thread"></div>
+      <div class="note-input-row">
+        <input id="qNoteInput" type="text" placeholder="Send a quick note…" />
+        <button class="secondary" onclick="sendGeneralNote()"><i data-lucide="send"></i>Send</button>
+      </div>
+
       <div class="section-title">Waiting to see you</div>
       <div id="qWaiting"></div>
       <div class="section-title">Currently with you</div>
@@ -293,6 +300,23 @@
     document.getElementById('pinInput').value = '';
   };
 
+  window.confirmLogout = async function(){
+    if(!await confirm('Log out of the dashboard?')) return;
+    await logout();
+  };
+
+  window.toggleUserMenu = function(){
+    const dd = document.getElementById('userMenuDD');
+    dd.classList.toggle('show');
+    const close = (e) => {
+      if(!document.getElementById('userMenu').contains(e.target)){
+        dd.classList.remove('show');
+        document.removeEventListener('click', close);
+      }
+    };
+    setTimeout(()=>document.addEventListener('click', close), 0);
+  };
+
   async function loadDashboard(){
     const { data: { user } } = await supabase.auth.getUser();
     if(!user) return;
@@ -310,6 +334,11 @@
     document.getElementById('dashboard').style.display = 'block';
     document.getElementById('whoName').textContent = officer.full_name;
     document.getElementById('whoTitle').textContent = officer.title;
+
+    const avatarEl = document.getElementById('userAvatar');
+    avatarEl.textContent = getInitials(officer.full_name);
+    avatarEl.className = `avatar sm ${getAvatarColor(officer.full_name)}`;
+    document.getElementById('userMenuName').textContent = officer.full_name.split(' ')[0];
 
     await renderAppointments();
     await renderQueue();
@@ -419,7 +448,8 @@
     const held = entries.filter(e => e.status === 'held');
 
     const badgeEl = document.getElementById('queueBadgeCount');
-    badgeEl.textContent = waiting.length ? ` (${waiting.length})` : '';
+    const total = entries.length;
+    badgeEl.textContent = total ? ` (${total})` : '';
 
     renderQueueSection('qWaiting', waiting, false);
     renderQueueSection('qCalled', called, true);
