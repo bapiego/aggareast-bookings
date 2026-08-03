@@ -434,7 +434,10 @@
         renderQueue();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'queue_entries', filter: `officer_id=eq.${myProfile.officer_id}` }, () => renderQueue())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes', filter: `officer_id=eq.${myProfile.officer_id}` }, () => renderNotesThread())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes', filter: `officer_id=eq.${myProfile.officer_id}` }, () => {
+        renderQueue();
+        if(visitorNoteEntryId) renderVisitorNoteThread();
+      })
       .subscribe();
   }
 
@@ -450,6 +453,18 @@
       .order('checked_in_at', { ascending: true });
 
     const entries = data || [];
+    const noteMap = {};
+    if(entries.length){
+      const { data: notes } = await supabase.from('queue_notes').select('*')
+        .in('queue_entry_id', entries.map(e => e.id))
+        .order('created_at', { ascending: true });
+      (notes || []).forEach(n => {
+        if(!n.queue_entry_id) return;
+        noteMap[n.queue_entry_id] = noteMap[n.queue_entry_id] || [];
+        noteMap[n.queue_entry_id].push(n);
+      });
+    }
+
     const waiting = entries.filter(e => e.status === 'waiting');
     const called = entries.filter(e => e.status === 'called');
     const held = entries.filter(e => e.status === 'held');
@@ -458,13 +473,13 @@
     const total = entries.length;
     badgeEl.textContent = total ? ` (${total})` : '';
 
-    renderQueueSection('qWaiting', waiting, false);
-    renderQueueSection('qCalled', called, true);
-    renderQueueSection('qHeld', held, false);
+    renderQueueSection('qWaiting', waiting, false, noteMap);
+    renderQueueSection('qCalled', called, true, noteMap);
+    renderQueueSection('qHeld', held, false, noteMap);
     await renderNotesThread();
   }
 
-  function renderQueueSection(containerId, list, alert){
+  function renderQueueSection(containerId, list, alert, noteMap){
     const el = document.getElementById(containerId);
     const icons = { qWaiting:'clock', qCalled:'phone-call', qHeld:'pause-circle' };
     const labels = { qWaiting:'Waiting visitors', qCalled:'Ready to see you', qHeld:'On hold' };
@@ -486,6 +501,10 @@
       btns += `<button class="secondary" onclick="openVisitorNote('${e.id}','${e.visitor_name.replace(/'/g,"\\'")}')"><i data-lucide="message-square"></i>Note</button>`;
       const heldNote = e.status === 'held' && e.held_note ? `<div class="purpose">Front desk says: "${e.held_note}"</div>` : '';
       const countdown = e.status === 'waiting' ? `<div class="countdown"><i data-lucide="clock" class="countdown-icon" style="width:12px;height:12px;"></i>${waitingSince(e.checked_in_at)}</div>` : '';
+      const notes = (noteMap && noteMap[e.id]) || [];
+      const notePreview = notes.length
+        ? `<div class="note-preview"><i data-lucide="message-square" class="note-preview-icon" style="width:13px;height:13px;"></i><span class="note-preview-text"><b>${notes[notes.length-1].sender_display_name}:</b> ${notes[notes.length-1].message}</span>${notes.length > 1 ? `<span class="note-count">${notes.length}</span>` : ''}</div>`
+        : '';
       return `<div class="appt ${alert ? 'queue-alert' : ''}">
         <div class="row1">
           <div style="display:flex;align-items:center;gap:10px;">
@@ -498,6 +517,7 @@
         ${countdown}
         ${e.purpose ? `<div class="purpose">${e.purpose}</div>` : ''}
         ${heldNote}
+        ${notePreview}
         <div class="btns">${btns}</div>
       </div>`;
     }).join('');

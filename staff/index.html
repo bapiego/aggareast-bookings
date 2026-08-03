@@ -630,7 +630,11 @@
         renderFrontDesk();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'queue_entries' }, () => renderFrontDesk())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes' }, () => renderNotesThread())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_notes' }, () => {
+        renderFrontDesk();
+        renderNotesThread();
+        if(visitorNoteEntryId) renderVisitorNoteThread();
+      })
       .subscribe();
   }
 
@@ -652,13 +656,25 @@
     const { data } = await q;
     fdEntries = data || [];
 
-    renderQueueSection('fdCalled', fdEntries.filter(e => e.status === 'called'), true);
-    renderQueueSection('fdHeld', fdEntries.filter(e => e.status === 'held'), true);
-    renderQueueSection('fdWaiting', fdEntries.filter(e => e.status === 'waiting'), false);
+    const noteMap = {};
+    if(fdEntries.length){
+      const { data: notes } = await supabase.from('queue_notes').select('*')
+        .in('queue_entry_id', fdEntries.map(e => e.id))
+        .order('created_at', { ascending: true });
+      (notes || []).forEach(n => {
+        if(!n.queue_entry_id) return;
+        noteMap[n.queue_entry_id] = noteMap[n.queue_entry_id] || [];
+        noteMap[n.queue_entry_id].push(n);
+      });
+    }
+
+    renderQueueSection('fdCalled', fdEntries.filter(e => e.status === 'called'), true, noteMap);
+    renderQueueSection('fdHeld', fdEntries.filter(e => e.status === 'held'), true, noteMap);
+    renderQueueSection('fdWaiting', fdEntries.filter(e => e.status === 'waiting'), false, noteMap);
     if(window.lucide) lucide.createIcons();
   }
 
-  function renderQueueSection(containerId, list, alert){
+  function renderQueueSection(containerId, list, alert, noteMap){
     const el = document.getElementById(containerId);
     const icons = { called:'phone-call', held:'pause-circle', waiting:'clock' };
     const labels = { called:'Ready to see you', held:'On hold', waiting:'In the queue' };
@@ -680,6 +696,10 @@
       btns += `<button class="danger" onclick="doQueueCancel('${e.id}')"><i data-lucide="x-circle"></i>Cancel</button>`;
       const heldNote = e.status === 'held' && e.held_note ? `<div class="purpose">"${e.held_note}"</div>` : '';
       const countdown = e.status === 'waiting' ? `<div class="countdown"><i data-lucide="clock" class="countdown-icon" style="width:12px;height:12px;"></i>${waitingSince(e.checked_in_at)}</div>` : '';
+      const notes = (noteMap && noteMap[e.id]) || [];
+      const notePreview = notes.length
+        ? `<div class="note-preview"><i data-lucide="message-square" class="note-preview-icon" style="width:13px;height:13px;"></i><span class="note-preview-text"><b>${notes[notes.length-1].sender_display_name}:</b> ${notes[notes.length-1].message}</span>${notes.length > 1 ? `<span class="note-count">${notes.length}</span>` : ''}</div>`
+        : '';
       return `<div class="appt ${alert ? 'queue-alert' : ''}">
         <div class="row1">
           <div style="display:flex;align-items:center;gap:10px;">
@@ -695,6 +715,7 @@
         ${countdown}
         ${e.purpose ? `<div class="purpose">${e.purpose}</div>` : ''}
         ${heldNote}
+        ${notePreview}
         <div class="btns">${btns}</div>
       </div>`;
     }).join('');
