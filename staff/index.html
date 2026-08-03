@@ -351,6 +351,19 @@
   </div>
 </div>
 
+<!-- Cancel Queue Entry Modal -->
+<div class="modal-bg" id="queueCancelModal">
+  <div class="modal">
+    <h3>Remove from queue</h3>
+    <label>Reason (optional — kept in the audit log)</label>
+    <input id="queueCancelReason" type="text" placeholder="e.g. Left without being seen" />
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('queueCancelModal')"><i data-lucide="x"></i>Cancel</button>
+      <button class="danger" style="margin-top:0" onclick="confirmQueueCancel()"><i data-lucide="x-circle"></i>Remove Visitor</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reschedule Modal -->
 <div class="modal-bg" id="rescheduleModal">
   <div class="modal">
@@ -697,10 +710,17 @@
     await supabase.rpc('queue_no_show', { p_entry_id: id });
     showToast('Marked no-show','success');
   };
+  let queueCancelTargetId = null;
   window.doQueueCancel = async (id) => {
-    const reason = prompt('Reason for cancelling (optional):') || null;
-    await supabase.rpc('queue_cancel', { p_entry_id: id, p_reason: reason });
-    showToast('Visitor removed from queue','success');
+    queueCancelTargetId = id;
+    document.getElementById('queueCancelReason').value = '';
+    document.getElementById('queueCancelModal').classList.add('show');
+  };
+  window.confirmQueueCancel = async () => {
+    const reason = document.getElementById('queueCancelReason').value.trim() || null;
+    closeModal('queueCancelModal');
+    await supabase.rpc('queue_cancel', { p_entry_id: queueCancelTargetId, p_reason: reason });
+    showToast('Visitor removed from queue', 'success');
   };
 
   let holdTargetId = null;
@@ -713,6 +733,7 @@
     const note = document.getElementById('holdNote').value.trim() || null;
     await supabase.rpc('queue_mark_held', { p_entry_id: holdTargetId, p_note: note });
     closeModal('holdModal');
+    showToast('Visitor marked not ready', 'success');
   };
 
   // ---------- Check-in ----------
@@ -759,14 +780,22 @@
     const church = document.getElementById('ciChurch').value.trim();
     const purpose = document.getElementById('ciPurpose').value.trim();
     const errEl = document.getElementById('checkInError');
+    const btn = document.querySelector('#checkInModal button.primary');
     if(!name || !phone){ errEl.innerHTML = '<div class="error">Name and phone are required.</div>'; return; }
 
+    showSpinner(btn);
     const { error } = await supabase.rpc('checkin_visitor', {
       p_officer_id: officerId, p_appointment_id: checkInLinkedAppointmentId,
       p_name: name, p_phone: phone, p_church: church, p_purpose: purpose
     });
-    if(error){ errEl.innerHTML = '<div class="error">Something went wrong. Please try again.</div>'; return; }
+    if(error){
+      hideSpinner(btn);
+      errEl.innerHTML = `<div class="error">${error.message || 'Something went wrong. Please try again.'}</div>`;
+      return;
+    }
+    hideSpinner(btn);
     closeModal('checkInModal');
+    showToast(`${name} checked in`, 'success');
   };
 
   // ---------- Notes ----------
@@ -1034,24 +1063,29 @@
     const date = document.getElementById('naDate').value;
     const time = document.getElementById('naTime').value;
     const errEl = document.getElementById('newApptError');
+    const btn = document.querySelector('#newApptModal button.primary');
     if(!name || !phone || !church || !date || !time){
       errEl.innerHTML = '<div class="error">Please fill in all required fields.</div>';
       return;
     }
+    showSpinner(btn);
     const { data: newId, error } = await supabase.rpc('create_appointment_staff', {
       p_officer_id: officerId, p_requester_name: name, p_requester_phone: phone,
       p_requester_church: church, p_purpose: purpose, p_date: date, p_time: time + ':00'
     });
     if(error){
+      hideSpinner(btn);
       errEl.innerHTML = error.code === '23505'
         ? '<div class="error">That officer already has an appointment at that time.</div>'
         : '<div class="error">Something went wrong. Please try again.</div>';
       return;
     }
+    hideSpinner(btn);
     closeModal('newApptModal');
     if(newId) await notifyStatus(newId, 'confirmed');
     await renderAppointments();
     await renderLog();
+    showToast('Appointment scheduled', 'success');
   };
 
   async function renderLog(){

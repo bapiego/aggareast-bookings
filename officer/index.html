@@ -200,6 +200,19 @@
   </div>
 </div>
 
+<!-- Cancel Queue Entry Modal -->
+<div class="modal-bg" id="queueCancelModal">
+  <div class="modal">
+    <h3>Remove from queue</h3>
+    <label>Reason (optional — kept in the audit log)</label>
+    <input id="queueCancelReason" type="text" placeholder="e.g. Left without being seen" />
+    <div class="btn-row">
+      <button class="secondary" onclick="closeModal('queueCancelModal')"><i data-lucide="x"></i>Cancel</button>
+      <button class="danger" style="margin-top:0" onclick="confirmQueueCancel()"><i data-lucide="x-circle"></i>Remove Visitor</button>
+    </div>
+  </div>
+</div>
+
 <!-- Per-visitor Note Modal -->
 <div class="modal-bg" id="visitorNoteModal">
   <div class="modal">
@@ -381,13 +394,7 @@
       Notification.requestPermission();
     }
   }
-  function showToast(msg){
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
-  }
+  function showToast(msg, type, duration){ window.showToast(msg, type, duration); }
 
   let heldAlertQueue = [];
   function queueHeldAlert(entry){
@@ -510,9 +517,16 @@
     await supabase.rpc('queue_mark_done', { p_entry_id: id });
     showToast('Marked done','success');
   };
+  let queueCancelTargetId = null;
   window.doQueueCancel = async (id) => {
-    const reason = prompt('Reason for cancelling (optional):') || null;
-    await supabase.rpc('queue_cancel', { p_entry_id: id, p_reason: reason });
+    queueCancelTargetId = id;
+    document.getElementById('queueCancelReason').value = '';
+    document.getElementById('queueCancelModal').classList.add('show');
+  };
+  window.confirmQueueCancel = async () => {
+    const reason = document.getElementById('queueCancelReason').value.trim() || null;
+    closeModal('queueCancelModal');
+    await supabase.rpc('queue_cancel', { p_entry_id: queueCancelTargetId, p_reason: reason });
     showToast('Visitor removed from queue','success');
   };
 
