@@ -301,12 +301,19 @@
 <div class="modal-bg" id="checkInModal">
   <div class="modal">
     <h3>Check in a visitor</h3>
-    <label>Phone number (to look up a booking, optional)</label>
-    <div style="display:flex; gap:8px;">
-      <input id="ciPhone" type="tel" style="flex:1" />
-      <button class="secondary" onclick="lookupBooking()"><i data-lucide="search"></i>Find</button>
+    <label>Phone number — bookings match as you type</label>
+    <div class="ci-search">
+      <input id="ciPhone" type="tel" placeholder="Start typing a phone number…" autocomplete="off" />
+      <div id="ciSuggest" class="suggest"></div>
     </div>
     <div id="ciLookupResult"></div>
+    <div id="ciInlineNew" style="display:none">
+      <div class="divider">No booking found — schedule one now</div>
+      <label>Appointment date</label>
+      <input id="ciNewDate" type="date" />
+      <label>Appointment time</label>
+      <input id="ciNewTime" type="time" />
+    </div>
     <label>Officer</label>
     <select id="ciOfficer"></select>
     <label>Visitor name</label>
@@ -744,33 +751,87 @@
     document.getElementById('ciPurpose').value = '';
     document.getElementById('ciLookupResult').innerHTML = '';
     document.getElementById('checkInError').innerHTML = '';
+    document.getElementById('ciInlineNew').style.display = 'none';
+    document.getElementById('ciNewDate').value = '';
+    document.getElementById('ciNewTime').value = '';
     checkInLinkedAppointmentId = null;
+    ciSuggestData = [];
+    const suggestEl = document.getElementById('ciSuggest');
+    if(suggestEl) suggestEl.innerHTML = '';
     document.getElementById('checkInModal').classList.add('show');
   };
 
   let checkInLinkedAppointmentId = null;
-  window.lookupBooking = async function(){
+  let ciSuggestData = [];
+  let ciDebounce = null;
+  let ciSearchSeq = 0;
+
+  window.ciOnInput = async function(){
+    clearTimeout(ciDebounce);
+    ciDebounce = setTimeout(() => ciSearch(), 300);
+  };
+
+  async function ciSearch(){
     const phone = document.getElementById('ciPhone').value.trim();
+    const suggestEl = document.getElementById('ciSuggest');
+    const inlineEl = document.getElementById('ciInlineNew');
     const resEl = document.getElementById('ciLookupResult');
-    if(!phone){ resEl.innerHTML = ''; return; }
-    const todayStr = new Date().toISOString().slice(0,10);
-    const { data } = await supabase.from('appointments').select('*')
-      .ilike('requester_phone', `%${phone.replace(/\D/g,'').slice(-9)}%`)
-      .eq('requested_date', todayStr)
-      .in('status', ['pending','confirmed'])
-      .limit(1);
-    if(data && data.length){
-      const a = data[0];
-      checkInLinkedAppointmentId = a.id;
-      document.getElementById('ciOfficer').value = a.officer_id;
-      document.getElementById('ciName').value = a.requester_name;
-      document.getElementById('ciChurch').value = a.requester_church || '';
-      document.getElementById('ciPurpose').value = a.purpose || '';
-      resEl.innerHTML = `<div class="info">Found today's booking for ${a.requester_name} — fields filled in.</div>`;
-    } else {
+    const seq = ++ciSearchSeq;
+    const digits = phone.replace(/\D/g, '');
+    if(digits.length < 3){
+      suggestEl.innerHTML = '';
+      inlineEl.style.display = 'none';
       checkInLinkedAppointmentId = null;
-      resEl.innerHTML = '<div class="info">No matching booking for today — fill in details for a walk-in.</div>';
+      ciSuggestData = [];
+      return;
     }
+    const { data } = await supabase.from('appointments').select('*')
+      .ilike('requester_phone', `%${digits.slice(-9)}%`)
+      .in('status', ['pending','confirmed'])
+      .limit(20);
+    if(seq !== ciSearchSeq) return;
+    const todayStr = new Date().toISOString().slice(0,10);
+    const all = (data || []).sort((a,b)=>{
+      const aUp = a.requested_date >= todayStr ? 0 : 1;
+      const bUp = b.requested_date >= todayStr ? 0 : 1;
+      if(aUp !== bUp) return aUp - bUp;
+      return a.requested_date === b.requested_date
+        ? a.requested_time.localeCompare(b.requested_time)
+        : (aUp === 0 ? a.requested_date.localeCompare(b.requested_date) : b.requested_date.localeCompare(a.requested_date));
+    });
+    ciSuggestData = all.slice(0,8);
+    checkInLinkedAppointmentId = null;
+    resEl.innerHTML = '';
+    if(!ciSuggestData.length){
+      suggestEl.innerHTML = `<div class="suggest-empty">No bookings found for this number.</div>`;
+      inlineEl.style.display = 'block';
+      return;
+    }
+    inlineEl.style.display = 'none';
+    suggestEl.innerHTML = ciSuggestData.map(a => `
+      <div class="suggest-item" onclick="ciSelect('${a.id}')">
+        ${avatarHTML(a.requester_name, 'sm')}
+        <div class="suggest-main">
+          <div class="suggest-name">${a.requester_name}</div>
+          <div class="suggest-when">${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))}</div>
+          <div class="suggest-meta">${officerName(a.officer_id)}</div>
+        </div>
+        <span class="badge ${a.status}">${a.status}</span>
+      </div>`).join('');
+    if(window.lucide) lucide.createIcons();
+  }
+
+  window.ciSelect = function(id){
+    const a = ciSuggestData.find(x => x.id === id);
+    if(!a) return;
+    checkInLinkedAppointmentId = a.id;
+    document.getElementById('ciOfficer').value = a.officer_id;
+    document.getElementById('ciName').value = a.requester_name;
+    document.getElementById('ciChurch').value = a.requester_church || '';
+    document.getElementById('ciPurpose').value = a.purpose || '';
+    document.getElementById('ciSuggest').innerHTML = '';
+    document.getElementById('ciInlineNew').style.display = 'none';
+    document.getElementById('ciLookupResult').innerHTML = `<div class="info">Selected: <b>${a.requester_name}</b> — ${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))} (${a.status})</div>`;
   };
 
   window.submitCheckIn = async function(){
@@ -784,8 +845,31 @@
     if(!name || !phone){ errEl.innerHTML = '<div class="error">Name and phone are required.</div>'; return; }
 
     showSpinner(btn);
+    let linkedId = checkInLinkedAppointmentId;
+
+    // Not pre-booked: if staff filled in date & time, create the appointment first
+    if(!linkedId){
+      const nd = document.getElementById('ciNewDate').value;
+      const nt = document.getElementById('ciNewTime').value;
+      if(nd && nt){
+        const { data: newId, error: createErr } = await supabase.rpc('create_appointment_staff', {
+          p_officer_id: officerId, p_requester_name: name, p_requester_phone: phone,
+          p_requester_church: church, p_purpose: purpose, p_date: nd, p_time: nt + ':00'
+        });
+        if(createErr){
+          hideSpinner(btn);
+          errEl.innerHTML = createErr.code === '23505'
+            ? '<div class="error">That officer already has an appointment at that time.</div>'
+            : '<div class="error">Could not create the appointment. Please try again.</div>';
+          return;
+        }
+        linkedId = newId;
+        if(newId) await notifyStatus(newId, 'confirmed');
+      }
+    }
+
     const { error } = await supabase.rpc('checkin_visitor', {
-      p_officer_id: officerId, p_appointment_id: checkInLinkedAppointmentId,
+      p_officer_id: officerId, p_appointment_id: linkedId,
       p_name: name, p_phone: phone, p_church: church, p_purpose: purpose
     });
     if(error){
@@ -795,6 +879,8 @@
     }
     hideSpinner(btn);
     closeModal('checkInModal');
+    await renderFrontDesk();
+    await renderAppointments();
     showToast(`${name} checked in`, 'success');
   };
 
@@ -1145,7 +1231,8 @@
 
   // ---------- Desktop keyboard workflow: Enter submits instead of forcing clicks ----------
   document.getElementById('pinInput').addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
-  document.getElementById('ciPhone').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); lookupBooking(); } });
+  document.getElementById('ciPhone').addEventListener('input', () => ciOnInput());
+  document.getElementById('ciPhone').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); if(ciSuggestData.length) ciSelect(ciSuggestData[0].id); } });
   document.getElementById('fdNoteInput').addEventListener('keydown', e => { if(e.key === 'Enter') sendGeneralNote(); });
   document.getElementById('vnInput').addEventListener('keydown', e => { if(e.key === 'Enter') sendVisitorNote(); });
 

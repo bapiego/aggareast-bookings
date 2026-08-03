@@ -1004,3 +1004,41 @@ button.gold .btn-spinner{ border-color:rgba(47,48,128,.2); border-top-color:var(
   .user-menu-btn span{ display:none; }
   .user-menu-btn{ padding:6px; }
 }
+
+/* Check-in phone-number live search */
+.ci-search{ position:relative; }
+.suggest{
+  position:absolute;
+  top:calc(100% + 4px);
+  left:0; right:0;
+  background:rgba(255,255,255,.98);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border:1px solid var(--lavender);
+  border-radius:12px;
+  box-shadow:0 12px 30px rgba(26,26,26,.18);
+  overflow:hidden;
+  z-index:60;
+  max-height:260px;
+  overflow-y:auto;
+}
+.suggest-item{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; cursor:pointer;
+  transition:background .15s;
+  border-bottom:1px solid rgba(180,184,218,.25);
+}
+.suggest-item:last-child{ border-bottom:none; }
+.suggest-item:hover{ background:var(--lavender-light); }
+.suggest-main{ flex:1; min-width:0; }
+.suggest-name{ font-weight:700; font-size:14px; color:var(--navy); }
+.suggest-when{ font-size:12.5px; color:var(--navy); margin-top:1px; }
+.suggest-meta{ font-size:11.5px; color:#6b6f8a; margin-top:1px; }
+.suggest-empty{ padding:14px; font-size:13px; color:#6b6f8a; text-align:center; }
+
+.divider{
+  display:flex; align-items:center; gap:10px;
+  margin:14px 0 4px; font-size:12.5px; font-weight:700; color:#6b6f8a;
+}
+.divider::before,
+.divider::after{ content:''; flex:1; height:1px; background:var(--lavender); }
