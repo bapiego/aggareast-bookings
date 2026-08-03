@@ -172,6 +172,7 @@
 </style>
   <!-- Modern UI layer (loads after inline styles). Remove this line to restore the original design. -->
   <link rel="stylesheet" href="assets/app.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 <div class="app">
@@ -202,7 +203,7 @@
     <div class="date-row" id="dateRow"></div>
     <div class="slot-grid" id="slotGrid"></div>
     <div class="btn-row">
-      <button class="secondary" onclick="goToStep(1)">Back</button>
+      <button class="secondary" onclick="goToStep(1)"><i data-lucide="arrow-left"></i>Back</button>
     </div>
   </div>
 
@@ -220,15 +221,15 @@
     <textarea id="fPurpose" placeholder="e.g. Discuss building permit approval for our new church auditorium in Adenta — the clearer your purpose, the sooner your appointment can be prioritized. Please avoid generic terms like 'official' or 'personal'."></textarea>
     <div id="formError"></div>
     <div class="btn-row">
-      <button class="secondary" onclick="goToStep(2)">Back</button>
-      <button class="primary" id="submitBtn" onclick="submitBooking()">Request Appointment</button>
+      <button class="secondary" onclick="goToStep(2)"><i data-lucide="arrow-left"></i>Back</button>
+      <button class="primary" id="submitBtn" onclick="submitBooking()"><i data-lucide="send"></i>Request Appointment</button>
     </div>
   </div>
 
   <!-- STEP 4 -->
   <div class="card" id="step4" style="display:none">
     <div class="confirm">
-      <div class="check">✓</div>
+      <div class="check"><i data-lucide="check-circle" style="width:28px;height:28px;"></i></div>
       <h2>Appointment Requested</h2>
       <p>
         Your request has been sent to the Regional Office. You'll receive an
@@ -278,9 +279,9 @@
       const range = oh.length ? `${fmtTime(oh[0].start_time)} – ${fmtTime(oh[0].end_time)}` : '';
       const btn = document.createElement('button');
       btn.className = 'officer-card';
-      btn.innerHTML = `<div class="eyebrow">${o.title}</div>
+      btn.innerHTML = `<div class="eyebrow"><i data-lucide="briefcase"></i> ${o.title}</div>
         <div class="name">${o.full_name}</div>
-        <div class="hours">Office hours: ${days}, ${range}</div>`;
+        <div class="hours"><i data-lucide="clock" style="width:13px;height:13px;"></i> Office hours: ${days}, ${range}</div>`;
       btn.onclick = () => selectOfficer(o);
       list.appendChild(btn);
     });
@@ -434,7 +435,8 @@
   }
   window.submitBooking = submitBooking;
 
-  loadOfficers();
+  loadOfficers().then(()=>{ if(window.lucide) lucide.createIcons(); });
+  document.addEventListener('DOMContentLoaded', ()=>{ if(window.lucide) lucide.createIcons(); });
 </script>
 </body>
 </html>

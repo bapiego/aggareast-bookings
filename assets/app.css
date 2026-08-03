@@ -572,3 +572,20 @@ footer{ letter-spacing: .04em; }
   background:var(--lavender-light);
   filter:none;
 }
+
+/* Lucide Icon Integration Helpers */
+.lucide {
+  display: inline-block;
+  vertical-align: middle;
+  stroke-width: 2.25;
+}
+button .lucide {
+  margin-right: 6px;
+  position: relative;
+  top: -1px;
+}
+.tab .lucide {
+  margin-right: 6px;
+  position: relative;
+  top: -1px;
+}

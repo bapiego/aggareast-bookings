@@ -63,6 +63,7 @@
 </style>
   <!-- Modern UI layer (loads after inline styles). Remove this line to restore the original design. -->
   <link rel="stylesheet" href="../assets/app.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 <div class="wrap">
@@ -79,7 +80,7 @@
     <label for="phoneInput">Phone number</label>
     <input id="phoneInput" type="tel" placeholder="e.g. 024 123 4567" />
     <div id="lookupError"></div>
-    <button class="primary" onclick="lookup()">View Appointment</button>
+    <button class="primary" onclick="lookup()"><i data-lucide="search"></i>View Appointment</button>
   </div>
 
   <div class="card" id="apptCard" style="display:none">
@@ -97,7 +98,7 @@
     <div class="date-row" id="dateRow"></div>
     <div class="slot-grid" id="slotGrid"></div>
     <div id="rescheduleError"></div>
-    <button class="secondary" style="width:100%; margin-top:14px" onclick="cancelReschedule()">Back</button>
+    <button class="secondary" style="width:100%; margin-top:14px" onclick="cancelReschedule()"><i data-lucide="arrow-left"></i>Back</button>
   </div>
 
   <footer>Assemblies of God, Ghana — Greater Accra East Region</footer>
@@ -163,8 +164,9 @@
       msgEl.innerHTML = '<div class="info">This appointment has already taken place.</div>';
     } else {
       btnsEl.innerHTML = `
-        <button class="secondary" onclick="openReschedule()">Request a different time</button>
-        <button class="danger" onclick="doCancel()">Cancel</button>`;
+        <button class="secondary" onclick="openReschedule()"><i data-lucide="calendar-range"></i>Request a different time</button>
+        <button class="danger" onclick="doCancel()"><i data-lucide="x-circle"></i>Cancel</button>`;
+      if(window.lucide) lucide.createIcons();
     }
   }
 
@@ -280,6 +282,8 @@
   const params = new URLSearchParams(window.location.search);
   const refParam = params.get('ref');
   if(refParam) document.getElementById('refInput').value = refParam;
+  if(window.lucide) lucide.createIcons();
+  document.addEventListener('DOMContentLoaded', ()=>{ if(window.lucide) lucide.createIcons(); });
 </script>
 </body>
 </html>
