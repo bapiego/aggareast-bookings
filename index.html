@@ -175,6 +175,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+<div class="toast-container" id="toastContainer"></div>
 <div class="app">
   <header class="brand">
     <img src="ag-shield-logo.png" alt="Assemblies of God shield" />
@@ -334,10 +335,10 @@
 
   async function renderSlots(){
     const grid = document.getElementById('slotGrid');
-    grid.innerHTML = '<div class="empty-note">Loading available times…</div>';
+    grid.innerHTML = '<div class="skeleton" style="height:80px;"></div><div class="skeleton" style="height:80px;"></div><div class="skeleton" style="height:80px;"></div>';
 
     const oh = state.officeHours.find(h=>h.officer_id===state.selectedOfficer.id && h.weekday===state.selectedDate.getDay());
-    if(!oh){ grid.innerHTML = '<div class="empty-note">No office hours on this day.</div>'; return; }
+    if(!oh){ grid.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="calendar-x"></i></div><div class="empty-title">No office hours</div><div class="empty-desc">This officer is not available on this day.</div></div>'; if(window.lucide) lucide.createIcons(); return; }
 
     const ds = dateStr(state.selectedDate);
     const { data: booked } = await supabase.rpc('public_taken_slots', {
@@ -375,7 +376,8 @@
       }
       grid.appendChild(btn);
     }
-    if(!any) grid.innerHTML = '<div class="empty-note">No open slots on this day — please pick another date.</div>';
+    if(!any) grid.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="calendar-off"></i></div><div class="empty-title">No open slots</div><div class="empty-desc">All times are booked or past. Please pick another date.</div></div>';
+    if(window.lucide) lucide.createIcons();
   }
 
   async function submitBooking(){
@@ -392,8 +394,7 @@
     }
 
     const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting…';
+    showSpinner(submitBtn);
 
     const newId = crypto.randomUUID();
     const { error } = await supabase.from('appointments').insert({
@@ -408,10 +409,8 @@
       status: 'pending'
     });
 
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Request Appointment';
-
     if(error){
+      hideSpinner(submitBtn);
       if(error.code === '23505'){
         errEl.innerHTML = '<div class="error">Sorry, that time slot was just taken. Please choose another.</div>';
         goToStep(2);
@@ -436,6 +435,54 @@
   window.submitBooking = submitBooking;
 
   loadOfficers().then(()=>{ if(window.lucide) lucide.createIcons(); });
+
+  // ============================================================
+  // UTILITY FUNCTIONS — Toasts, Avatars, Relative Time
+  // ============================================================
+
+  window.showToast = function(msg, type='info', duration=3500){
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icons = { success:'check-circle', error:'alert-circle', info:'info' };
+    el.innerHTML = `<i data-lucide="${icons[type]||'info'}" class="toast-icon" style="width:18px;height:18px;"></i><span class="toast-msg">${msg}</span>`;
+    container.appendChild(el);
+    if(window.lucide) lucide.createIcons();
+    setTimeout(()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); }, duration);
+  };
+
+  window.alert = function(msg){ showToast(msg, 'info', 4000); };
+
+  window.timeAgo = function(ts){
+    const diff = Date.now() - new Date(ts).getTime();
+    const secs = Math.floor(diff/1000);
+    if(secs < 60) return 'just now';
+    const mins = Math.floor(secs/60);
+    if(mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins/60);
+    if(hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs/24);
+    return `${days}d ago`;
+  };
+
+  window.getInitials = function(name){
+    if(!name) return '?';
+    return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  };
+
+  window.getAvatarColor = function(name){
+    if(!name) return 'c0';
+    let hash = 0;
+    for(let i=0;i<name.length;i++) hash = name.charCodeAt(i)+((hash<<5)-hash);
+    return 'c'+(Math.abs(hash)%8);
+  };
+
+  window.avatarHTML = function(name, size='sm'){
+    const initials = getInitials(name);
+    const color = getAvatarColor(name);
+    return `<span class="avatar ${size} ${color}">${initials}</span>`;
+  };
+
   document.addEventListener('DOMContentLoaded', ()=>{ if(window.lucide) lucide.createIcons(); });
 </script>
 </body>

@@ -154,6 +154,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="staff-page">
+<div class="toast-container" id="toastContainer"></div>
 <div class="wrap">
   <header class="brand">
     <div class="region">Greater Accra East Region</div>
@@ -426,11 +427,13 @@
     const email = document.getElementById('roleSelect').value;
     const pin = document.getElementById('pinInput').value.trim();
     const errEl = document.getElementById('loginError');
+    const btn = document.querySelector('#loginCard button.primary');
     errEl.innerHTML = '';
     if(!pin){ errEl.innerHTML = '<div class="error">Please enter your PIN.</div>'; return; }
 
+    showSpinner(btn);
     const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
-    if(error){ errEl.innerHTML = '<div class="error">Incorrect PIN. Please try again.</div>'; return; }
+    if(error){ hideSpinner(btn); errEl.innerHTML = '<div class="error">Incorrect PIN. Please try again.</div>'; return; }
 
     await loadDashboard();
   };
@@ -534,13 +537,7 @@
       Notification.requestPermission();
     }
   }
-  function showToast(msg){
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
-  }
+  function showToast(msg){ window.showToast(msg); }
 
   let callInAlertQueue = [];
   function queueCallInAlert(entry){
@@ -610,7 +607,12 @@
 
   function renderQueueSection(containerId, list, alert){
     const el = document.getElementById(containerId);
-    if(!list.length){ el.innerHTML = '<div class="empty-note">None right now.</div>'; return; }
+    const icons = { called:'phone-call', held:'pause-circle', waiting:'clock' };
+    const labels = { called:'Ready to see you', held:'On hold', waiting:'In the queue' };
+    if(!list.length){
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="${icons[containerId.replace('fd','').toLowerCase()]||'inbox'}"></i></div><div class="empty-title">${labels[containerId.replace('fd','').toLowerCase()]||'Empty'}</div><div class="empty-desc">Nobody here right now.</div></div>`;
+      return;
+    }
     el.innerHTML = list.map(e => {
       let btns = '';
       if(e.status === 'called'){
@@ -624,15 +626,20 @@
       btns += `<button class="secondary" onclick="openVisitorNote('${e.id}','${e.officer_id}','${e.visitor_name.replace(/'/g,"\\'")}')"><i data-lucide="message-square"></i>Note</button>`;
       btns += `<button class="danger" onclick="doQueueCancel('${e.id}')"><i data-lucide="x-circle"></i>Cancel</button>`;
       const heldNote = e.status === 'held' && e.held_note ? `<div class="purpose">"${e.held_note}"</div>` : '';
+      const countdown = e.status === 'waiting' ? `<div class="countdown"><i data-lucide="clock" class="countdown-icon" style="width:12px;height:12px;"></i>${waitingSince(e.checked_in_at)}</div>` : '';
       return `<div class="appt ${alert ? 'queue-alert' : ''}">
         <div class="row1">
-          <div>
-            <div class="when">${e.visitor_name}</div>
-            <div class="officer-name">${officerName(e.officer_id)} · checked in ${fmtWhen(e.checked_in_at)}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${avatarHTML(e.visitor_name, 'md')}
+            <div>
+              <div class="when">${e.visitor_name}</div>
+              <div class="officer-name">${officerName(e.officer_id)} · checked in ${timeAgo(e.checked_in_at)}</div>
+            </div>
           </div>
           <div class="badge ${e.status}">${e.status.replace('_',' ')}</div>
         </div>
         <div class="meta">${e.visitor_phone} · ${e.visitor_church || ''}</div>
+        ${countdown}
         ${e.purpose ? `<div class="purpose">${e.purpose}</div>` : ''}
         ${heldNote}
         <div class="btns">${btns}</div>
@@ -640,12 +647,27 @@
     }).join('');
   }
 
-  window.doQueueDone = async (id) => { await supabase.rpc('queue_mark_done', { p_entry_id: id }); };
-  window.doQueueReady = async (id) => { await supabase.rpc('queue_mark_ready', { p_entry_id: id }); };
-  window.doQueueNoShow = async (id) => { if(confirm('Mark as no-show?')) await supabase.rpc('queue_no_show', { p_entry_id: id }); };
+  window.doQueueDone = async (id) => {
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
+    await supabase.rpc('queue_mark_done', { p_entry_id: id });
+    showToast('Marked done','success');
+  };
+  window.doQueueReady = async (id) => {
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
+    await supabase.rpc('queue_mark_ready', { p_entry_id: id });
+    showToast('Marked ready','success');
+  };
+  window.doQueueNoShow = async (id) => {
+    if(!await confirm('Mark as no-show?')) return;
+    await supabase.rpc('queue_no_show', { p_entry_id: id });
+    showToast('Marked no-show','success');
+  };
   window.doQueueCancel = async (id) => {
     const reason = prompt('Reason for cancelling (optional):') || null;
     await supabase.rpc('queue_cancel', { p_entry_id: id, p_reason: reason });
+    showToast('Visitor removed from queue','success');
   };
 
   let holdTargetId = null;
@@ -725,7 +747,7 @@
       el.innerHTML = '<div class="error">Could not load notes — <button class="secondary" onclick="renderNotesThread()">Retry</button></div>';
       return;
     }
-    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    el.innerHTML = (data||[]).map(n => `<div class="note-line">${avatarHTML(n.sender_display_name, 'sm')}<div class="note-content"><b>${n.sender_display_name}:</b> ${n.message}</div></div>`).join('') || '<div class="empty-note">No notes yet.</div>';
     el.scrollTop = el.scrollHeight;
   }
   window.renderNotesThread = renderNotesThread;
@@ -758,7 +780,7 @@
       el.innerHTML = '<div class="error">Could not load notes — <button class="secondary" onclick="renderVisitorNoteThread()">Retry</button></div>';
       return;
     }
-    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    el.innerHTML = (data||[]).map(n => `<div class="note-line">${avatarHTML(n.sender_display_name, 'sm')}<div class="note-content"><b>${n.sender_display_name}:</b> ${n.message}</div></div>`).join('') || '<div class="empty-note">No notes yet.</div>';
   }
   window.renderVisitorNoteThread = renderVisitorNoteThread;
   window.sendVisitorNote = async function(){
@@ -861,7 +883,12 @@
 
   function renderList(containerId, list, proxyMap){
     const el = document.getElementById(containerId);
-    if(!list.length){ el.innerHTML = '<div class="empty-note">Nothing here.</div>'; return; }
+    if(!list.length){
+      const icon = containerId==='upcomingList'?'calendar-clock':'calendar-check';
+      const title = containerId==='upcomingList'?'No upcoming appointments':'No past appointments';
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="${icon}"></i></div><div class="empty-title">${title}</div><div class="empty-desc">Appointments will appear here.</div></div>`;
+      return;
+    }
     const todayStr = new Date().toISOString().slice(0,10);
     el.innerHTML = list.map(a => {
       const proxy = proxyMap[a.id];
@@ -880,9 +907,12 @@
       }
       return `<div class="appt">
         <div class="row1">
-          <div>
-            <div class="when">${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))}</div>
-            <div class="officer-name">${officerName(a.officer_id)}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${avatarHTML(a.requester_name, 'md')}
+            <div>
+              <div class="when">${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))}</div>
+              <div class="officer-name">${officerName(a.officer_id)}</div>
+            </div>
           </div>
           <div class="badge ${a.status}">${a.status}</div>
         </div>
@@ -901,17 +931,26 @@
   }
 
   window.doConfirm = async function(id){
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'confirmed', p_note: null });
-    if(!error){ await notifyStatus(id, 'confirmed'); await renderAppointments(); await renderLog(); }
+    if(!error){ await notifyStatus(id, 'confirmed'); await renderAppointments(); await renderLog(); showToast('Appointment confirmed','success'); }
+    else { if(btn) hideSpinner(btn); showToast('Could not confirm appointment','error'); }
   };
   window.doCancel = async function(id){
-    if(!confirm('Cancel this appointment?')) return;
+    if(!await confirm('Cancel this appointment?')) return;
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'cancelled', p_note: null });
-    if(!error){ await notifyStatus(id, 'cancelled'); await renderAppointments(); await renderLog(); }
+    if(!error){ await notifyStatus(id, 'cancelled'); await renderAppointments(); await renderLog(); showToast('Appointment cancelled','success'); }
+    else { if(btn) hideSpinner(btn); showToast('Could not cancel appointment','error'); }
   };
   window.doComplete = async function(id){
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'completed', p_note: null });
-    if(!error){ await renderAppointments(); await renderLog(); }
+    if(!error){ await renderAppointments(); await renderLog(); showToast('Marked completed','success'); }
+    else { if(btn) hideSpinner(btn); showToast('Could not complete appointment','error'); }
   };
 
   window.openReschedule = function(id){
@@ -987,10 +1026,18 @@
     if(logFilterOfficerId !== 'all') q = q.eq('acted_for_officer_id', logFilterOfficerId);
     const { data: logs } = await q;
     const el = document.getElementById('logList');
-    if(!logs || !logs.length){ el.innerHTML = '<div class="empty-note">No activity yet.</div>'; return; }
+    if(!logs || !logs.length){
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="scroll-text"></i></div><div class="empty-title">No activity yet</div><div class="empty-desc">Actions will appear here as they happen.</div></div>`;
+      if(window.lucide) lucide.createIcons();
+      return;
+    }
     el.innerHTML = logs.map(l => `
       <div class="log-row">
-        <div class="top"><span>${l.action.toUpperCase()} — ${officerName(l.acted_for_officer_id)}</span><span>${l.actor_display_name} (${l.actor_role})</span></div>
+        <div class="top" style="display:flex;align-items:center;gap:8px;">
+          ${avatarHTML(l.actor_display_name, 'sm')}
+          <span><b>${l.action.toUpperCase()}</b> — ${officerName(l.acted_for_officer_id)}</span>
+          <span style="margin-left:auto;" class="relative-time">${timeAgo(l.created_at)}</span>
+        </div>
         ${l.note ? `<div class="note">${l.note}</div>` : ''}
         <div class="ts">${new Date(l.created_at).toLocaleString('en-GB')}</div>
       </div>`).join('');
@@ -1039,6 +1086,100 @@
   window.openCheckIn = function(){
     _openCheckIn();
     setTimeout(() => document.getElementById('ciPhone').focus(), 50);
+  };
+
+  // ============================================================
+  // UTILITY FUNCTIONS — Toasts, Avatars, Relative Time, Spinners
+  // ============================================================
+
+  // Toast notification system
+  window.showToast = function(msg, type='info', duration=3500){
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icons = { success:'check-circle', error:'alert-circle', info:'info' };
+    el.innerHTML = `<i data-lucide="${icons[type]||'info'}" class="toast-icon" style="width:18px;height:18px;"></i><span class="toast-msg">${msg}</span>`;
+    container.appendChild(el);
+    if(window.lucide) lucide.createIcons();
+    setTimeout(()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); }, duration);
+  };
+
+  // Replace native alert with toast
+  window.alert = function(msg){ showToast(msg, 'info', 4000); };
+
+  // Replace native confirm with promise-based toast
+  window._confirmResolve = null;
+  window.confirm = function(msg){
+    return new Promise(resolve=>{
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      el.className = 'toast info';
+      el.style.cursor = 'pointer';
+      el.innerHTML = `<i data-lucide="help-circle" class="toast-icon" style="width:18px;height:18px;"></i><span class="toast-msg">${msg} — Tap to confirm</span>`;
+      container.appendChild(el);
+      if(window.lucide) lucide.createIcons();
+      el.onclick = ()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); resolve(true); };
+      setTimeout(()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); resolve(false); }, 6000);
+    });
+  };
+
+  // Relative time ("2 min ago")
+  window.timeAgo = function(ts){
+    const now = Date.now();
+    const diff = now - new Date(ts).getTime();
+    const secs = Math.floor(diff/1000);
+    if(secs < 60) return 'just now';
+    const mins = Math.floor(secs/60);
+    if(mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins/60);
+    if(hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs/24);
+    return `${days}d ago`;
+  };
+
+  // Countdown ("Waiting 5m")
+  window.waitingSince = function(ts){
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff/60000);
+    if(mins < 1) return 'Just arrived';
+    if(mins < 60) return `Waiting ${mins}m`;
+    const hrs = Math.floor(mins/60);
+    return `Waiting ${hrs}h ${mins%60}m`;
+  };
+
+  // Avatar initials
+  window.getInitials = function(name){
+    if(!name) return '?';
+    return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  };
+
+  // Avatar color (consistent by name)
+  window.getAvatarColor = function(name){
+    if(!name) return 'c0';
+    let hash = 0;
+    for(let i=0;i<name.length;i++) hash = name.charCodeAt(i)+((hash<<5)-hash);
+    return 'c'+(Math.abs(hash)%8);
+  };
+
+  // Button spinner
+  window.showSpinner = function(btn){
+    btn.dataset.origText = btn.innerHTML;
+    btn.disabled = true;
+    const text = btn.textContent.trim();
+    btn.innerHTML = `<span class="btn-spinner"></span>${text}`;
+    if(window.lucide) lucide.createIcons();
+  };
+  window.hideSpinner = function(btn){
+    btn.disabled = false;
+    if(btn.dataset.origText) btn.innerHTML = btn.dataset.origText;
+    if(window.lucide) lucide.createIcons();
+  };
+
+  // Generate avatar HTML
+  window.avatarHTML = function(name, size='sm'){
+    const initials = getInitials(name);
+    const color = getAvatarColor(name);
+    return `<span class="avatar ${size} ${color}">${initials}</span>`;
   };
 
   async function init(){

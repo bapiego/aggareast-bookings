@@ -66,6 +66,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+<div class="toast-container" id="toastContainer"></div>
 <div class="wrap">
   <header class="brand">
     <div class="region">Greater Accra East Region</div>
@@ -129,11 +130,14 @@
     const ref = document.getElementById('refInput').value.trim();
     const phone = document.getElementById('phoneInput').value.trim();
     const errEl = document.getElementById('lookupError');
+    const btn = document.querySelector('#lookupCard button.primary');
     errEl.innerHTML = '';
     if(!ref || !phone){ errEl.innerHTML = '<div class="error">Please enter both your reference and phone number.</div>'; return; }
 
+    showSpinner(btn);
     const { data, error } = await supabase.rpc('get_appointment_for_requester', { p_ref: ref, p_phone: phone });
     if(error || !data || !data.length){
+      hideSpinner(btn);
       errEl.innerHTML = '<div class="error">We couldn\'t find an appointment with those details. Please check and try again.</div>';
       return;
     }
@@ -171,11 +175,12 @@
   }
 
   window.doCancel = async function(){
-    if(!confirm('Cancel this appointment?')) return;
+    if(!await confirm('Cancel this appointment?')) return;
     const { error } = await supabase.rpc('requester_cancel', { p_ref: current.id, p_phone: lastPhone });
-    if(error){ alert('Something went wrong. Please try again.'); return; }
+    if(error){ showToast('Something went wrong. Please try again.', 'error'); return; }
     current.status = 'cancelled';
     renderAppt();
+    showToast('Appointment cancelled', 'success');
   };
 
   window.openReschedule = async function(){
@@ -276,12 +281,61 @@
     document.getElementById('rescheduleCard').style.display = 'none';
     renderAppt();
     document.getElementById('apptMsg').innerHTML = '<div class="info">New time requested. The office will confirm by phone.</div>';
+    showToast('New time requested!', 'success');
   }
 
   // Pre-fill from ?ref= link
   const params = new URLSearchParams(window.location.search);
   const refParam = params.get('ref');
   if(refParam) document.getElementById('refInput').value = refParam;
+
+  // ============================================================
+  // UTILITY FUNCTIONS — Toasts, Avatars, Relative Time
+  // ============================================================
+
+  window.showToast = function(msg, type='info', duration=3500){
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icons = { success:'check-circle', error:'alert-circle', info:'info' };
+    el.innerHTML = `<i data-lucide="${icons[type]||'info'}" class="toast-icon" style="width:18px;height:18px;"></i><span class="toast-msg">${msg}</span>`;
+    container.appendChild(el);
+    if(window.lucide) lucide.createIcons();
+    setTimeout(()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); }, duration);
+  };
+
+  window.alert = function(msg){ showToast(msg, 'info', 4000); };
+
+  window.timeAgo = function(ts){
+    const diff = Date.now() - new Date(ts).getTime();
+    const secs = Math.floor(diff/1000);
+    if(secs < 60) return 'just now';
+    const mins = Math.floor(secs/60);
+    if(mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins/60);
+    if(hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs/24);
+    return `${days}d ago`;
+  };
+
+  window.getInitials = function(name){
+    if(!name) return '?';
+    return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  };
+
+  window.getAvatarColor = function(name){
+    if(!name) return 'c0';
+    let hash = 0;
+    for(let i=0;i<name.length;i++) hash = name.charCodeAt(i)+((hash<<5)-hash);
+    return 'c'+(Math.abs(hash)%8);
+  };
+
+  window.avatarHTML = function(name, size='sm'){
+    const initials = getInitials(name);
+    const color = getAvatarColor(name);
+    return `<span class="avatar ${size} ${color}">${initials}</span>`;
+  };
+
   if(window.lucide) lucide.createIcons();
   document.addEventListener('DOMContentLoaded', ()=>{ if(window.lucide) lucide.createIcons(); });
 </script>

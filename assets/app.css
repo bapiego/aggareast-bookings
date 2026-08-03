@@ -744,3 +744,219 @@ input, textarea, select, button {
     animation-delay: 0ms !important;
   }
 }
+
+/* ============================================================
+   SKELETON LOADERS — Shimmer placeholder cards
+   ============================================================ */
+.skeleton{
+  position:relative;
+  overflow:hidden;
+  background:rgba(180,184,218,.15);
+  border-radius:10px;
+  min-height:60px;
+}
+.skeleton::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,.5) 50%, transparent 100%);
+  animation:shimmer 1.5s infinite;
+}
+@keyframes shimmer{
+  0%{ transform:translateX(-100%); }
+  100%{ transform:translateX(100%); }
+}
+.skeleton-line{ height:14px; margin-bottom:10px; border-radius:6px; }
+.skeleton-line.w60{ width:60%; }
+.skeleton-line.w80{ width:80%; }
+.skeleton-line.w40{ width:40%; }
+.skeleton-circle{ width:40px; height:40px; border-radius:50%; }
+
+/* ============================================================
+   TOAST NOTIFICATIONS — Non-blocking confirmations
+   ============================================================ */
+.toast-container{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:9999;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:center;
+  pointer-events:none;
+}
+.toast{
+  pointer-events:auto;
+  background:rgba(47,48,128,.92);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  color:var(--white);
+  padding:12px 20px;
+  border-radius:12px;
+  font-size:14px;
+  font-weight:600;
+  box-shadow:0 8px 32px rgba(31,38,135,.25);
+  border:1px solid rgba(255,255,255,.15);
+  display:flex;
+  align-items:center;
+  gap:8px;
+  max-width:90vw;
+  animation:toastIn .4s cubic-bezier(.175,.885,.32,1.275);
+}
+.toast.success{ border-left:3px solid #48bb78; }
+.toast.error{ border-left:3px solid #fc8181; }
+.toast.info{ border-left:3px solid var(--gold); }
+.toast.exiting{ animation:toastOut .3s ease-in forwards; }
+@keyframes toastOut{
+  to{ opacity:0; transform:translateY(10px) scale(.95); }
+}
+.toast .toast-icon{ flex-shrink:0; }
+.toast .toast-msg{ flex:1; }
+
+/* ============================================================
+   EMPTY STATES — Illustrated + actionable
+   ============================================================ */
+.empty-state{
+  text-align:center;
+  padding:32px 20px;
+  color:#8890a8;
+}
+.empty-state .empty-icon{
+  width:56px;
+  height:56px;
+  margin:0 auto 14px;
+  background:rgba(180,184,218,.15);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--lavender);
+}
+.empty-state .empty-title{
+  font-size:15px;
+  font-weight:600;
+  color:var(--navy);
+  margin-bottom:4px;
+}
+.empty-state .empty-desc{
+  font-size:13px;
+  color:#8890a8;
+  line-height:1.5;
+}
+
+/* ============================================================
+   AVATAR INITIALS — Visual identity
+   ============================================================ */
+.avatar{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  font-weight:700;
+  color:var(--white);
+  flex-shrink:0;
+  text-transform:uppercase;
+}
+.avatar.sm{ width:28px; height:28px; font-size:11px; }
+.avatar.md{ width:36px; height:36px; font-size:13px; }
+.avatar.lg{ width:48px; height:48px; font-size:16px; }
+.avatar.xl{ width:64px; height:64px; font-size:20px; }
+
+/* Avatar color palette (cycled by index) */
+.avatar.c0{ background:var(--navy); }
+.avatar.c1{ background:#5b6abf; }
+.avatar.c2{ background:#7c3aed; }
+.avatar.c3{ background:#2563eb; }
+.avatar.c4{ background:#0891b2; }
+.avatar.c5{ background:#059669; }
+.avatar.c6{ background:#d97706; }
+.avatar.c7{ background:#dc2626; }
+
+/* Avatar with online/status dot */
+.avatar-wrap{ position:relative; display:inline-block; }
+.avatar-wrap .status-dot{
+  position:absolute;
+  bottom:0;
+  right:0;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  border:2px solid var(--white);
+}
+.avatar-wrap .status-dot.online{ background:#48bb78; }
+.avatar-wrap .status-dot.busy{ background:#ed8936; }
+.avatar-wrap .status-dot.offline{ background:#a0aec0; }
+
+/* ============================================================
+   BUTTON SPINNERS — Loading state
+   ============================================================ */
+.btn-spinner{
+  display:inline-block;
+  width:16px;
+  height:16px;
+  border:2px solid rgba(255,255,255,.3);
+  border-top-color:var(--white);
+  border-radius:50%;
+  animation:spin .6s linear infinite;
+  vertical-align:middle;
+  margin-right:6px;
+}
+button.primary .btn-spinner{ border-color:rgba(255,255,255,.3); border-top-color:var(--white); }
+button.secondary .btn-spinner,
+button.gold .btn-spinner{ border-color:rgba(47,48,128,.2); border-top-color:var(--navy); }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* ============================================================
+   RELATIVE TIME — "2 min ago" styling
+   ============================================================ */
+.relative-time{
+  font-size:12px;
+  color:#8890a8;
+  font-weight:500;
+}
+.relative-time.live{
+  color:var(--navy);
+  font-weight:600;
+}
+
+/* ============================================================
+   QUEUE COUNTDOWN — "Waiting 5m"
+   ============================================================ */
+.countdown{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  font-size:12px;
+  font-weight:600;
+  color:#8890a8;
+  margin-top:4px;
+}
+.countdown .countdown-icon{ color:var(--lavender); }
+.countdown.urgent{ color:#e53e3e; }
+.countdown.urgent .countdown-icon{ color:#e53e3e; }
+
+/* ============================================================
+   ENHANCED EMPTY NOTE (override old plain text)
+   ============================================================ */
+.empty-note{
+  text-align:center;
+  color:#8890a8;
+  font-size:13.5px;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+}
+.empty-note .lucide{ color:var(--lavender); }
+
+/* ============================================================
+   RESPONSIVE AVATAR IN CARDS
+   ============================================================ */
+.appt .row1{ gap:10px; }
+.appt .avatar-wrap{ margin-right:4px; }
+.note-line{ display:flex; gap:8px; align-items:flex-start; }
+.note-line .avatar{ flex-shrink:0; margin-top:2px; }
+.note-line .note-content{ flex:1; min-width:0; }

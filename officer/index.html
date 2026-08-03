@@ -120,6 +120,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+<div class="toast-container" id="toastContainer"></div>
 <div class="wrap">
   <header class="brand">
     <div class="region">Greater Accra East Region</div>
@@ -270,13 +271,15 @@
     const officerId = document.getElementById('officerSelect').value;
     const pin = document.getElementById('pinInput').value.trim();
     const errEl = document.getElementById('loginError');
+    const btn = document.querySelector('#loginCard button.primary');
     errEl.innerHTML = '';
     const officer = officers.find(o => o.id === officerId);
     if(!officer || !pin){ errEl.innerHTML = '<div class="error">Please select your name and enter your PIN.</div>'; return; }
 
+    showSpinner(btn);
     const email = EMAIL_BY_TITLE[officer.title];
     const { error } = await supabase.auth.signInWithPassword({ email, password: pin });
-    if(error){ errEl.innerHTML = '<div class="error">Incorrect PIN. Please try again.</div>'; return; }
+    if(error){ hideSpinner(btn); errEl.innerHTML = '<div class="error">Incorrect PIN. Please try again.</div>'; return; }
 
     await loadDashboard();
   };
@@ -426,7 +429,12 @@
 
   function renderQueueSection(containerId, list, alert){
     const el = document.getElementById(containerId);
-    if(!list.length){ el.innerHTML = '<div class="empty-note">Nobody here.</div>'; return; }
+    const icons = { qWaiting:'clock', qCalled:'phone-call', qHeld:'pause-circle' };
+    const labels = { qWaiting:'Waiting visitors', qCalled:'Ready to see you', qHeld:'On hold' };
+    if(!list.length){
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="${icons[containerId]||'inbox'}"></i></div><div class="empty-title">${labels[containerId]||'Empty'}</div><div class="empty-desc">Nobody here right now.</div></div>`;
+      return;
+    }
     el.innerHTML = list.map(e => {
       let btns = '';
       if(e.status === 'waiting'){
@@ -440,12 +448,17 @@
       }
       btns += `<button class="secondary" onclick="openVisitorNote('${e.id}','${e.visitor_name.replace(/'/g,"\\'")}')"><i data-lucide="message-square"></i>Note</button>`;
       const heldNote = e.status === 'held' && e.held_note ? `<div class="purpose">Front desk says: "${e.held_note}"</div>` : '';
+      const countdown = e.status === 'waiting' ? `<div class="countdown"><i data-lucide="clock" class="countdown-icon" style="width:12px;height:12px;"></i>${waitingSince(e.checked_in_at)}</div>` : '';
       return `<div class="appt ${alert ? 'queue-alert' : ''}">
         <div class="row1">
-          <div class="when">${e.visitor_name}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${avatarHTML(e.visitor_name, 'md')}
+            <div class="when">${e.visitor_name}</div>
+          </div>
           <div class="badge ${e.status}">${e.status.replace('_',' ')}</div>
         </div>
-        <div class="meta">${e.visitor_phone} · ${e.visitor_church || ''} · checked in ${fmtWhen(e.checked_in_at)}</div>
+        <div class="meta">${e.visitor_phone} · ${e.visitor_church || ''} · checked in ${timeAgo(e.checked_in_at)}</div>
+        ${countdown}
         ${e.purpose ? `<div class="purpose">${e.purpose}</div>` : ''}
         ${heldNote}
         <div class="btns">${btns}</div>
@@ -455,13 +468,22 @@
   }
 
   window.doCallIn = async (id) => {
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('queue_call_in', { p_entry_id: id });
-    if(error) alert('Could not call them in — please try again.');
+    if(error){ if(btn) hideSpinner(btn); showToast('Could not call them in','error'); }
+    else showToast('Visitor called in','success');
   };
-  window.doQueueDone = async (id) => { await supabase.rpc('queue_mark_done', { p_entry_id: id }); };
+  window.doQueueDone = async (id) => {
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
+    await supabase.rpc('queue_mark_done', { p_entry_id: id });
+    showToast('Marked done','success');
+  };
   window.doQueueCancel = async (id) => {
     const reason = prompt('Reason for cancelling (optional):') || null;
     await supabase.rpc('queue_cancel', { p_entry_id: id, p_reason: reason });
+    showToast('Visitor removed from queue','success');
   };
 
   let rescheduleQueueEntryId = null;
@@ -486,7 +508,7 @@
       el.innerHTML = '<div class="error">Could not load the conversation — <button class="secondary" onclick="renderNotesThread()">Retry</button></div>';
       return;
     }
-    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    el.innerHTML = (data||[]).map(n => `<div class="note-line">${avatarHTML(n.sender_display_name, 'sm')}<div class="note-content"><b>${n.sender_display_name}:</b> ${n.message}</div></div>`).join('') || '<div class="empty-note">No notes yet.</div>';
     el.scrollTop = el.scrollHeight;
   }
   window.renderNotesThread = renderNotesThread;
@@ -518,7 +540,7 @@
       el.innerHTML = '<div class="error">Could not load notes — <button class="secondary" onclick="renderVisitorNoteThread()">Retry</button></div>';
       return;
     }
-    el.innerHTML = (data||[]).map(n => `<div class="note-line"><b>${n.sender_display_name}:</b> ${n.message}</div>`).join('') || '<div class="empty-note">No notes yet.</div>';
+    el.innerHTML = (data||[]).map(n => `<div class="note-line">${avatarHTML(n.sender_display_name, 'sm')}<div class="note-content"><b>${n.sender_display_name}:</b> ${n.message}</div></div>`).join('') || '<div class="empty-note">No notes yet.</div>';
   }
   window.renderVisitorNoteThread = renderVisitorNoteThread;
   window.sendVisitorNote = async function(){
@@ -572,7 +594,12 @@
 
   function renderList(containerId, list, proxyMap, showActions){
     const el = document.getElementById(containerId);
-    if(!list.length){ el.innerHTML = '<div class="empty-note">Nothing here.</div>'; return; }
+    if(!list.length){
+      const icons = { pendingList:'clock', upcomingList:'calendar-clock', pastList:'calendar-check' };
+      const titles = { pendingList:'No pending appointments', upcomingList:'No upcoming appointments', pastList:'No past appointments' };
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="${icons[containerId]||'calendar'}"></i></div><div class="empty-title">${titles[containerId]||'No appointments'}</div><div class="empty-desc">Appointments will appear here.</div></div>`;
+      return;
+    }
     el.innerHTML = list.map(a => {
       const proxy = proxyMap[a.id];
       const proxyTag = proxy ? `<div class="proxy-tag">${proxy.action[0].toUpperCase()+proxy.action.slice(1)} by ${proxy.actor_display_name} (${proxy.actor_role})</div>` : '';
@@ -592,10 +619,15 @@
       }
       return `<div class="appt">
         <div class="row1">
-          <div class="when">${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${avatarHTML(a.requester_name, 'md')}
+            <div>
+              <div class="when">${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))}</div>
+              <div class="who">${a.requester_name}</div>
+            </div>
+          </div>
           <div class="badge ${a.status}">${a.status}</div>
         </div>
-        <div class="who">${a.requester_name}</div>
         <div class="meta">${a.requester_phone} · ${a.requester_church}</div>
         ${a.purpose ? `<div class="purpose">${a.purpose}</div>` : ''}
         ${proxyTag}
@@ -611,17 +643,26 @@
   }
 
   window.doConfirm = async function(id){
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'confirmed', p_note: null });
-    if(!error){ await notifyStatus(id, 'confirmed'); await renderAppointments(); }
+    if(!error){ await notifyStatus(id, 'confirmed'); await renderAppointments(); showToast('Appointment confirmed','success'); }
+    else { if(btn) hideSpinner(btn); showToast('Could not confirm appointment','error'); }
   };
   window.doCancel = async function(id){
-    if(!confirm('Cancel this appointment?')) return;
+    if(!await confirm('Cancel this appointment?')) return;
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'cancelled', p_note: null });
-    if(!error){ await notifyStatus(id, 'cancelled'); await renderAppointments(); }
+    if(!error){ await notifyStatus(id, 'cancelled'); await renderAppointments(); showToast('Appointment cancelled','success'); }
+    else { if(btn) hideSpinner(btn); showToast('Could not cancel appointment','error'); }
   };
   window.doComplete = async function(id){
+    const btn = event.target.closest('button');
+    if(btn) showSpinner(btn);
     const { error } = await supabase.rpc('update_appointment_status', { p_appointment_id: id, p_new_status: 'completed', p_note: null });
-    if(!error) await renderAppointments();
+    if(!error){ await renderAppointments(); showToast('Marked completed','success'); }
+    else { if(btn) hideSpinner(btn); showToast('Could not complete appointment','error'); }
   };
 
   window.openReschedule = function(id){
@@ -676,6 +717,89 @@
   };
 
   window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
+
+  // ============================================================
+  // UTILITY FUNCTIONS — Toasts, Avatars, Relative Time, Spinners
+  // ============================================================
+
+  window.showToast = function(msg, type='info', duration=3500){
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icons = { success:'check-circle', error:'alert-circle', info:'info' };
+    el.innerHTML = `<i data-lucide="${icons[type]||'info'}" class="toast-icon" style="width:18px;height:18px;"></i><span class="toast-msg">${msg}</span>`;
+    container.appendChild(el);
+    if(window.lucide) lucide.createIcons();
+    setTimeout(()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); }, duration);
+  };
+
+  window.alert = function(msg){ showToast(msg, 'info', 4000); };
+
+  window.confirm = function(msg){
+    return new Promise(resolve=>{
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      el.className = 'toast info';
+      el.style.cursor = 'pointer';
+      el.innerHTML = `<i data-lucide="help-circle" class="toast-icon" style="width:18px;height:18px;"></i><span class="toast-msg">${msg} — Tap to confirm</span>`;
+      container.appendChild(el);
+      if(window.lucide) lucide.createIcons();
+      el.onclick = ()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); resolve(true); };
+      setTimeout(()=>{ el.classList.add('exiting'); setTimeout(()=>el.remove(), 300); resolve(false); }, 6000);
+    });
+  };
+
+  window.timeAgo = function(ts){
+    const diff = Date.now() - new Date(ts).getTime();
+    const secs = Math.floor(diff/1000);
+    if(secs < 60) return 'just now';
+    const mins = Math.floor(secs/60);
+    if(mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins/60);
+    if(hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs/24);
+    return `${days}d ago`;
+  };
+
+  window.waitingSince = function(ts){
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff/60000);
+    if(mins < 1) return 'Just arrived';
+    if(mins < 60) return `Waiting ${mins}m`;
+    const hrs = Math.floor(mins/60);
+    return `Waiting ${hrs}h ${mins%60}m`;
+  };
+
+  window.getInitials = function(name){
+    if(!name) return '?';
+    return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  };
+
+  window.getAvatarColor = function(name){
+    if(!name) return 'c0';
+    let hash = 0;
+    for(let i=0;i<name.length;i++) hash = name.charCodeAt(i)+((hash<<5)-hash);
+    return 'c'+(Math.abs(hash)%8);
+  };
+
+  window.showSpinner = function(btn){
+    btn.dataset.origText = btn.innerHTML;
+    btn.disabled = true;
+    const text = btn.textContent.trim();
+    btn.innerHTML = `<span class="btn-spinner"></span>${text}`;
+    if(window.lucide) lucide.createIcons();
+  };
+  window.hideSpinner = function(btn){
+    btn.disabled = false;
+    if(btn.dataset.origText) btn.innerHTML = btn.dataset.origText;
+    if(window.lucide) lucide.createIcons();
+  };
+
+  window.avatarHTML = function(name, size='sm'){
+    const initials = getInitials(name);
+    const color = getAvatarColor(name);
+    return `<span class="avatar ${size} ${color}">${initials}</span>`;
+  };
 
   async function init(){
     await loadOfficersIntoSelect();
