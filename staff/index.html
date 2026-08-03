@@ -63,6 +63,18 @@
   .error{ background:#FDECEC; color:#9B2C2C; border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
   .info{ background:var(--lavender-light); color:var(--navy); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:14px; }
 
+  /* Desk-phone dialing (via the local phone bridge on this PC) */
+  .phone-pill{
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+    font-size:12px; font-weight:700; padding:7px 12px; border-radius:20px;
+  }
+  .phone-pill::before{ content:''; width:8px; height:8px; border-radius:50%; background:currentColor; opacity:.7; }
+  .phone-pill.on{ background:rgba(221,243,228,.92); color:#1F7A3F; }
+  .phone-pill.off{ background:rgba(253,236,236,.92); color:#9B2C2C; }
+  button.call-btn{ background:#DDF3E4; color:#1F7A3F; }
+  button.call-btn:hover{ background:#C4E8D0; }
+  button.call-btn:disabled{ background:#ccc; color:#666; cursor:not-allowed; }
+
   #topbar{ display:none; justify-content:space-between; align-items:center; margin-top:18px; color:var(--white); flex-wrap:wrap; gap:10px; }
   #topbar .who{ font-family:"Cambria",serif; font-weight:700; font-size:17px; }
   #topbar .title{ font-size:12px; opacity:.85; text-transform:uppercase; letter-spacing:.06em; }
@@ -166,6 +178,7 @@
       <div class="title" id="whoTitle"></div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
+      <span id="phoneStatus" class="phone-pill off" title="Desk phone dialing bridge — runs on this PC">Desk phone: …</span>
       <div class="primary-actions">
         <button class="gold" onclick="openCheckIn()"><i data-lucide="user-plus"></i>Check In</button>
         <button class="gold" onclick="openNewAppt()"><i data-lucide="calendar-plus"></i>New Appointment</button>
@@ -533,6 +546,8 @@
     await renderFrontDesk();
     subscribeRealtime();
     startNotesPolling();
+    checkPhoneBridge();
+    setInterval(checkPhoneBridge, 30000);
   }
 
   function selectApptOfficer(id){
@@ -684,6 +699,7 @@
     }
     el.innerHTML = list.map(e => {
       let btns = '';
+      if(e.visitor_phone) btns += `<button class="secondary call-btn" onclick="placePhoneCall('${e.visitor_phone.replace(/'/g,"\\'")}')"><i data-lucide="phone"></i>Call</button>`;
       if(e.status === 'called'){
         btns += `<button class="danger" onclick="openHold('${e.id}')"><i data-lucide="pause"></i>Not Ready</button>`;
         btns += `<button class="secondary" onclick="doQueueDone('${e.id}')"><i data-lucide="check-circle"></i>Mark Done</button>`;
@@ -698,7 +714,7 @@
       const countdown = e.status === 'waiting' ? `<div class="countdown"><i data-lucide="clock" class="countdown-icon" style="width:12px;height:12px;"></i>${waitingSince(e.checked_in_at)}</div>` : '';
       const notes = (noteMap && noteMap[e.id]) || [];
       const notePreview = notes.length
-        ? `<div class="note-preview"><i data-lucide="message-square" class="note-preview-icon" style="width:13px;height:13px;"></i><span class="note-preview-text"><b>${notes[notes.length-1].sender_display_name}:</b> ${notes[notes.length-1].message}</span>${notes.length > 1 ? `<span class="note-count">${notes.length}</span>` : ''}</div>`
+        ? `<div class="note-preview" onclick="openVisitorNote('${e.id}','${e.officer_id}','${e.visitor_name.replace(/'/g,"\\'")}')"><i data-lucide="message-square" class="note-preview-icon" style="width:13px;height:13px;"></i><span class="note-preview-text"><b>${notes[notes.length-1].sender_display_name}:</b> ${notes[notes.length-1].message}</span>${notes.length > 1 ? `<span class="note-count">${notes.length}</span>` : ''}</div>`
         : '';
       return `<div class="appt ${alert ? 'queue-alert' : ''}">
         <div class="row1">
@@ -1064,6 +1080,7 @@
       const proxyTag = proxy ? `<div class="proxy-tag">${proxy.action[0].toUpperCase()+proxy.action.slice(1)} by ${proxy.actor_display_name} (${proxy.actor_role})</div>` : '';
       const isFuture = a.requested_date >= todayStr;
       let btns = '';
+      if(a.requester_phone) btns += `<button class="secondary call-btn" onclick="placePhoneCall('${a.requester_phone.replace(/'/g,"\\'")}')"><i data-lucide="phone"></i>Call</button>`;
       if(a.status === 'confirmed' && !isFuture){
         btns += `<button class="secondary" onclick="doComplete('${a.id}')"><i data-lucide="check-circle"></i>Mark Completed</button>`;
       }
@@ -1356,6 +1373,71 @@
     const color = getAvatarColor(name);
     return `<span class="avatar ${size} ${color}">${initials}</span>`;
   };
+
+  // ---------- Desk-phone dialing via the local phone bridge ----------
+  // The bridge is a tiny server on THIS receptionist PC (http://127.0.0.1:8741,
+  // see phone-bridge/bridge.ps1 in the repo). The browser can't reach the
+  // Grandstream phone directly (HTTPS page -> HTTP phone is blocked), so the
+  // dashboard talks to the bridge and the bridge dials the phone.
+  function phoneBridgeUrl(){
+    return localStorage.getItem('phoneBridgeUrl') || 'http://127.0.0.1:8741';
+  }
+
+  function normalizePhone(v){
+    if(!v) return '';
+    const t = String(v).trim();
+    if(!/^\+?[\d\s\-()]+$/.test(t)) return '';
+    let n = t.replace(/[^\d+]/g,'');
+    if(n.indexOf('+') > 0) n = n.replace(/\+/g,'');
+    return n.length >= 6 ? n : '';
+  }
+
+  window.placePhoneCall = async function(raw){
+    const number = normalizePhone(raw);
+    if(!number){ showToast('Invalid phone number','error'); return; }
+    const btn = event && event.target && event.target.closest ? event.target.closest('button') : null;
+    if(btn) showSpinner(btn);
+    try{
+      const res = await fetch(phoneBridgeUrl() + '/call', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ number })
+      });
+      let data = {};
+      try { data = await res.json(); } catch(e){}
+      if(!res.ok || data.ok === false){
+        showToast(data.error || 'The phone could not place the call.','error');
+      } else {
+        showToast(`Dialing ${number} on the desk phone…`,'success');
+      }
+    }catch(e){
+      showToast('Could not reach the phone bridge. Is bridge.ps1 running on this PC?','error');
+    }finally{
+      if(btn) hideSpinner(btn);
+    }
+  };
+
+  async function checkPhoneBridge(){
+    const el = document.getElementById('phoneStatus');
+    if(!el) return;
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 3000);
+    try{
+      const res = await fetch(phoneBridgeUrl() + '/ping', { signal: controller.signal });
+      if(res.ok){
+        el.textContent = 'Desk phone: ready';
+        el.className = 'phone-pill on';
+      } else {
+        el.textContent = 'Desk phone: offline';
+        el.className = 'phone-pill off';
+      }
+    }catch(e){
+      el.textContent = 'Desk phone: offline';
+      el.className = 'phone-pill off';
+    }finally{
+      clearTimeout(timer);
+    }
+  }
 
   async function init(){
     await loadOfficers();
