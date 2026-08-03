@@ -322,10 +322,11 @@
     <div id="ciLookupResult"></div>
     <div id="ciInlineNew" style="display:none">
       <div class="divider">No booking found — schedule one now</div>
+      <div class="hint">Fill in a date &amp; time to book and check in at once. Leave date &amp; time blank to check in as a walk-in.</div>
       <label>Appointment date</label>
-      <input id="ciNewDate" type="date" />
+      <input id="ciNewDate" type="date" oninput="ciUpdateBtn()" />
       <label>Appointment time</label>
-      <input id="ciNewTime" type="time" />
+      <input id="ciNewTime" type="time" oninput="ciUpdateBtn()" />
     </div>
     <label>Officer</label>
     <select id="ciOfficer"></select>
@@ -808,6 +809,16 @@
     ciDebounce = setTimeout(() => ciSearch(), 300);
   };
 
+  window.ciUpdateBtn = function(){
+    const btn = document.querySelector('#checkInModal button.primary');
+    const nd = document.getElementById('ciNewDate').value;
+    const nt = document.getElementById('ciNewTime').value;
+    btn.innerHTML = (nd && nt)
+      ? '<i data-lucide="calendar-check"></i>Schedule &amp; Check In'
+      : '<i data-lucide="user-check"></i>Check In';
+    if(window.lucide) lucide.createIcons();
+  };
+
   async function ciSearch(){
     const phone = document.getElementById('ciPhone').value.trim();
     const suggestEl = document.getElementById('ciSuggest');
@@ -869,7 +880,10 @@
     document.getElementById('ciPurpose').value = a.purpose || '';
     document.getElementById('ciSuggest').innerHTML = '';
     document.getElementById('ciInlineNew').style.display = 'none';
+    document.getElementById('ciNewDate').value = '';
+    document.getElementById('ciNewTime').value = '';
     document.getElementById('ciLookupResult').innerHTML = `<div class="info">Selected: <b>${a.requester_name}</b> — ${fmtDate(a.requested_date)} · ${fmtTime(a.requested_time.slice(0,5))} (${a.status})</div>`;
+    ciUpdateBtn();
   };
 
   window.submitCheckIn = async function(){
@@ -1278,6 +1292,7 @@
   const _openCheckIn = window.openCheckIn;
   window.openCheckIn = function(){
     _openCheckIn();
+    ciUpdateBtn();
     setTimeout(() => document.getElementById('ciPhone').focus(), 50);
   };
 
