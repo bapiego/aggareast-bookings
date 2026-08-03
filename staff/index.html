@@ -828,6 +828,7 @@
     const digits = phone.replace(/\D/g, '');
     if(digits.length < 3){
       suggestEl.innerHTML = '';
+      resEl.innerHTML = '';
       inlineEl.style.display = 'none';
       checkInLinkedAppointmentId = null;
       ciSuggestData = [];
@@ -851,7 +852,8 @@
     checkInLinkedAppointmentId = null;
     resEl.innerHTML = '';
     if(!ciSuggestData.length){
-      suggestEl.innerHTML = `<div class="suggest-empty">No bookings found for this number.</div>`;
+      suggestEl.innerHTML = '';
+      resEl.innerHTML = `<div class="info">No bookings found for this number — fill in a date &amp; time below to schedule and check in at once.</div>`;
       inlineEl.style.display = 'block';
       return;
     }
