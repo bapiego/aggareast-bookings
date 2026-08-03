@@ -862,6 +862,7 @@
     const a = ciSuggestData.find(x => x.id === id);
     if(!a) return;
     checkInLinkedAppointmentId = a.id;
+    document.getElementById('ciPhone').value = a.requester_phone || '';
     document.getElementById('ciOfficer').value = a.officer_id;
     document.getElementById('ciName').value = a.requester_name;
     document.getElementById('ciChurch').value = a.requester_church || '';
