@@ -376,11 +376,13 @@ input:focus, textarea:focus, select:focus,
   border: 1px solid rgba(255, 255, 255, 0.65) !important;
   box-shadow: var(--shadow-lg) !important;
   border-radius: 20px;
-  animation: modalIn .22s var(--ease-out);
+  animation: modalIn .4s cubic-bezier(.175,.885,.32,1.275);
 }
 @keyframes modalIn{
-  from{ opacity: 0; transform: translateY(8px) scale(.98); }
-  to{ opacity: 1; transform: none; }
+  0%{ opacity: 0; transform: translateY(40px) scale(.92); }
+  50%{ opacity: 1; transform: translateY(-6px) scale(1.01); }
+  70%{ transform: translateY(3px) scale(.995); }
+  100%{ opacity: 1; transform: none; }
 }
 
 .alert-overlay {
@@ -588,4 +590,157 @@ button .lucide {
   margin-right: 6px;
   position: relative;
   top: -1px;
+}
+
+/* ============================================================
+   MOTION ANIMATIONS — Physics-based spring & stagger effects
+   Pure CSS, no JS library required. $0 cost.
+   ============================================================ */
+
+/* --- Spring Alert Bounce --- */
+.alert-card {
+  animation: alertBounce .5s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes alertBounce{
+  0%{ opacity: 0; transform: scale(.7) translateY(30px); }
+  40%{ opacity: 1; transform: scale(1.06) translateY(-8px); }
+  60%{ transform: scale(.97) translateY(3px); }
+  80%{ transform: scale(1.01) translateY(-1px); }
+  100%{ opacity: 1; transform: none; }
+}
+
+/* --- Toast Slide-Up --- */
+.toast {
+  animation: toastIn .45s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes toastIn{
+  0%{ opacity: 0; transform: translateX(-50%) translateY(30px) scale(.9); }
+  50%{ opacity: 1; transform: translateX(-50%) translateY(-4px) scale(1.02); }
+  100%{ opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* --- Button Tactile Press --- */
+button.primary:active:not(:disabled),
+button.secondary:active,
+button.danger:active,
+button.gold:active {
+  animation: btnPress .2s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes btnPress{
+  0%{ transform: translateY(0); }
+  40%{ transform: translateY(1.5px) scale(.97); }
+  100%{ transform: translateY(0) scale(1); }
+}
+
+/* --- Card & Appt Queue Stagger Entrance --- */
+.appt, .card, .officer-card, .log-row {
+  animation: cardFadeIn .35s cubic-bezier(.22,.61,.36,1) both;
+}
+@keyframes cardFadeIn{
+  0%{ opacity: 0; transform: translateY(12px); }
+  100%{ opacity: 1; transform: none; }
+}
+/* Staggered delay for list items */
+.appt:nth-child(1), .card:nth-child(1), .log-row:nth-child(1){ animation-delay: 0ms; }
+.appt:nth-child(2), .card:nth-child(2), .log-row:nth-child(2){ animation-delay: 40ms; }
+.appt:nth-child(3), .card:nth-child(3), .log-row:nth-child(3){ animation-delay: 80ms; }
+.appt:nth-child(4), .card:nth-child(4), .log-row:nth-child(4){ animation-delay: 120ms; }
+.appt:nth-child(5), .card:nth-child(5), .log-row:nth-child(5){ animation-delay: 160ms; }
+.appt:nth-child(6), .card:nth-child(6), .log-row:nth-child(6){ animation-delay: 200ms; }
+.appt:nth-child(7), .card:nth-child(7), .log-row:nth-child(7){ animation-delay: 240ms; }
+.appt:nth-child(8), .card:nth-child(8), .log-row:nth-child(8){ animation-delay: 280ms; }
+
+/* --- Ribbon Step Transition --- */
+.ribbon .seg.active {
+  animation: segPop .3s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes segPop{
+  0%{ transform: scale(.92); }
+  50%{ transform: scale(1.04); }
+  100%{ transform: none; }
+}
+
+/* --- Chip & Slot Select Bounce --- */
+.chip.selected, .officer-chip.active, .slot.selected {
+  animation: chipBounce .3s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes chipBounce{
+  0%{ transform: scale(.94); }
+  40%{ transform: scale(1.06); }
+  70%{ transform: scale(.98); }
+  100%{ transform: none; }
+}
+
+/* --- Badge Pulse on Status Change --- */
+.badge {
+  animation: badgePop .35s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes badgePop{
+  0%{ transform: scale(.8); opacity: .5; }
+  50%{ transform: scale(1.1); }
+  100%{ transform: none; opacity: 1; }
+}
+
+/* --- Queue Alert Gold Glow Pulse --- */
+.queue-alert {
+  animation: alertGlow 2s ease-in-out infinite;
+}
+@keyframes alertGlow{
+  0%,100%{ box-shadow: 0 0 0 3px rgba(238,223,16,.2), var(--neu-flat); }
+  50%{ box-shadow: 0 0 0 6px rgba(238,223,16,.35), var(--neu-flat); }
+}
+
+/* --- Check Confirm Spin-In --- */
+.confirm .check {
+  animation: checkSpin .6s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes checkSpin{
+  0%{ transform: scale(0) rotate(-180deg); opacity: 0; }
+  60%{ transform: scale(1.15) rotate(10deg); opacity: 1; }
+  80%{ transform: scale(.95) rotate(-3deg); }
+  100%{ transform: none; opacity: 1; }
+}
+
+/* --- Page Load Header Fade --- */
+header.brand {
+  animation: headerFade .5s ease-out;
+}
+@keyframes headerFade{
+  0%{ opacity: 0; transform: translateY(-8px); }
+  100%{ opacity: 1; transform: none; }
+}
+
+/* --- Tab Switch Crossfade --- */
+#frontDeskView, #apptsView, #logView, #pinsView {
+  animation: viewFade .25s ease-out;
+}
+@keyframes viewFade{
+  0%{ opacity: 0; }
+  100%{ opacity: 1; }
+}
+
+/* --- Note Thread Slide-In --- */
+.note-line {
+  animation: noteSlide .25s ease-out;
+}
+@keyframes noteSlide{
+  0%{ opacity: 0; transform: translateX(-6px); }
+  100%{ opacity: 1; transform: none; }
+}
+
+/* --- Smooth Focus Ring Transition --- */
+input, textarea, select, button {
+  transition: box-shadow .2s var(--ease-out), transform .15s var(--ease-out), background .2s var(--ease-out), border-color .2s var(--ease-out);
+}
+
+/* --- Reduced Motion Respect --- */
+@media (prefers-reduced-motion: reduce){
+  .appt, .card, .officer-card, .log-row,
+  .alert-card, .toast, .confirm .check,
+  .ribbon .seg.active, .chip.selected, .officer-chip.active,
+  .slot.selected, .badge, .queue-alert, header.brand,
+  #frontDeskView, #apptsView, #logView, #pinsView, .note-line {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+  }
 }
